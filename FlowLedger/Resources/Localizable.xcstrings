@@ -16,6 +16,9 @@
     "Accounts" : {
 
     },
+    "Active Rules" : {
+
+    },
     "Add Account" : {
 
     },
@@ -40,19 +43,28 @@
     "Amount (e.g. 12.50)" : {
 
     },
+    "Amount (e.g. 1200.00)" : {
+
+    },
     "Appearance" : {
 
     },
-    "Balance" : {
+    "Auto-run Recurring (daily)" : {
 
     },
-    "Build" : {
+    "Automation" : {
+
+    },
+    "Balance" : {
 
     },
     "Cancel" : {
 
     },
     "Category" : {
+
+    },
+    "Category (optional)" : {
 
     },
     "CHF 120 / mo" : {
@@ -79,10 +91,10 @@
     "Date" : {
 
     },
-    "Developer" : {
+    "Developer Options" : {
 
     },
-    "Developer Options" : {
+    "Developer Tools" : {
 
     },
     "Emergency Fund" : {
@@ -109,6 +121,9 @@
     "Flags" : {
 
     },
+    "FlowLedger v1.0" : {
+
+    },
     "From Account" : {
 
     },
@@ -133,13 +148,31 @@
     "Language and iCloud toggles are UI placeholders for now. Actual localization and CloudKit sync will be wired later." : {
 
     },
+    "Made with SwiftUI + SwiftData" : {
+
+    },
     "Month" : {
+
+    },
+    "Monthly day: %lld" : {
+
+    },
+    "More" : {
+
+    },
+    "Name" : {
 
     },
     "Net" : {
 
     },
+    "New Rule" : {
+
+    },
     "No expenses this month" : {
+
+    },
+    "No rules yet" : {
 
     },
     "No transactions yet" : {
@@ -166,10 +199,22 @@
     "Recent" : {
 
     },
+    "Recurrence" : {
+
+    },
+    "Recurring Rules" : {
+
+    },
     "Reorder" : {
 
     },
     "Reports" : {
+
+    },
+    "Run for Today" : {
+
+    },
+    "Run Recurring Now" : {
 
     },
     "Save" : {
@@ -179,9 +224,6 @@
 
     },
     "Seed demo data (TODO)" : {
-
-    },
-    "Settings" : {
 
     },
     "Share Report" : {
@@ -255,6 +297,9 @@
     "To Account" : {
 
     },
+    "Tools" : {
+
+    },
     "Top Categories" : {
 
     },
@@ -267,7 +312,10 @@
     "Verbose logs" : {
 
     },
-    "Version" : {
+    "Weekly option can be added later" : {
+
+    },
+    "What" : {
 
     }
   },
