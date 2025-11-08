@@ -73,6 +73,12 @@
     "Expenses" : {
 
     },
+    "Export PDF" : {
+
+    },
+    "Failed to create report" : {
+
+    },
     "Goals (placeholder)" : {
 
     },
@@ -91,6 +97,9 @@
     "Net" : {
 
     },
+    "No expenses this month" : {
+
+    },
     "No transactions yet" : {
 
     },
@@ -98,6 +107,9 @@
 
     },
     "Note (optional)" : {
+
+    },
+    "Notes" : {
 
     },
     "Outflow" : {
@@ -109,13 +121,22 @@
     "Reorder" : {
 
     },
+    "Reports" : {
+
+    },
     "Save" : {
 
     },
     "Search note…" : {
 
     },
+    "Share Report" : {
+
+    },
     "Show cleared only" : {
+
+    },
+    "Summary" : {
 
     },
     "tab.accounts" : {
@@ -167,6 +188,12 @@
           }
         }
       }
+    },
+    "This is a UI-only preview. Real data will come after we wire SwiftData." : {
+
+    },
+    "Top Categories" : {
+
     },
     "Transfer" : {
 

@@ -16,7 +16,7 @@ struct RootTabs: View {
                 .tabItem { Label(String(localized: "tab.transactions"), systemImage: "list.bullet.rectangle") }
             NavigationStack { AccountsScreen() }
                 .tabItem { Label(String(localized: "tab.accounts"), systemImage: "creditcard.fill") }
-            NavigationStack { Placeholder(title: "Reports") }
+            NavigationStack { ReportsScreen() }
                 .tabItem { Label(String(localized: "tab.reports"), systemImage: "doc.text.magnifyingglass") }
             NavigationStack { Placeholder(title: "More") }
                 .tabItem { Label(String(localized: "tab.more"), systemImage: "gearshape.fill") }
