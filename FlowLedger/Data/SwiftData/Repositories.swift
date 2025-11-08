@@ -15,7 +15,7 @@ final class SDAccountRepository: AccountRepository {
     init(ctx: ModelContext) { self.ctx = ctx }
 
     func list() async throws -> [Account] {
-        var fetch = FetchDescriptor<AccountEntity>(
+        let fetch = FetchDescriptor<AccountEntity>(
             sortBy: [SortDescriptor(\.name, order: .forward)]
         )
         let rows = try ctx.fetch(fetch)
@@ -108,7 +108,7 @@ final class SDTransactionRepository: TransactionRepository {
             }
         }
 
-        var fetch = FetchDescriptor<TransactionEntity>(
+        let fetch = FetchDescriptor<TransactionEntity>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
