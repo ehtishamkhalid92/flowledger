@@ -104,13 +104,14 @@ struct OverviewScreen: View {
             .padding(16)
         }
         .background(AppTheme.bg.ignoresSafeArea())
+        .scrollIndicators(.hidden)
         .navigationTitle(String(localized: "tab.overview"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Add Expense", systemImage: "minus.circle") {}
-                    Button("Add Income", systemImage: "plus.circle") {}
-                    Button("Transfer", systemImage: "arrow.left.arrow.right") {}
+                    Button("Add Expense", systemImage: "minus.circle.fill") {}
+                    Button("Add Income", systemImage: "plus.circle.fill") {}
+                    Button("Transfer", systemImage: "arrow.left.arrow.right.circle.fill") {}
                 } label: { Image(systemName: "plus.circle.fill") }
             }
         }

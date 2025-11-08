@@ -8,22 +8,27 @@
 import SwiftUI
 
 enum AppTheme {
+    // MARK: - Colors
     static let bg = Color(.systemGroupedBackground)
     static let card = Color(.secondarySystemGroupedBackground)
-    static let expense = Color.red
-    static let income  = Color.green
+    static let accent = Color.accentColor
 
-    static func section(_ text: String) -> some View {
-        Text(text).font(.title2).bold()
+    // MARK: - Text Styles
+    static func section(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 4)
     }
+
+    // MARK: - Shadows & Corner Radius
+    static let cornerRadius: CGFloat = 16
+    static let shadow = ShadowStyle(radius: 4, y: 1)
 }
 
-struct SectionCard<Content: View>: View {
-    let content: Content
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) { content }
-            .padding(16)
-            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
+struct ShadowStyle {
+    let radius: CGFloat
+    let y: CGFloat
 }

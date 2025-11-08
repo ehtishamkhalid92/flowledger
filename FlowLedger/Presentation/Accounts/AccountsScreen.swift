@@ -45,6 +45,7 @@ struct AccountsScreen: View {
             .padding(16)
         }
         .background(AppTheme.bg.ignoresSafeArea())
+        .scrollIndicators(.hidden)
         .navigationTitle("Accounts")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

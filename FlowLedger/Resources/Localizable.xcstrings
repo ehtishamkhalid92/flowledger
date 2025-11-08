@@ -10,6 +10,9 @@
     "↓" : {
 
     },
+    "About" : {
+
+    },
     "Account" : {
 
     },
@@ -40,7 +43,13 @@
     "Amount (e.g. 12.50)" : {
 
     },
+    "Appearance" : {
+
+    },
     "Balance" : {
+
+    },
+    "Build" : {
 
     },
     "Cancel" : {
@@ -55,13 +64,28 @@
     "CHF 700 / mo" : {
 
     },
+    "Clear all data (TODO)" : {
+
+    },
     "Cleared" : {
 
     },
     "Coming soon" : {
 
     },
+    "Currency" : {
+
+    },
+    "Data" : {
+
+    },
     "Date" : {
+
+    },
+    "Developer" : {
+
+    },
+    "Developer Options" : {
 
     },
     "Emergency Fund" : {
@@ -73,13 +97,25 @@
     "Expenses" : {
 
     },
+    "Export" : {
+
+    },
+    "Export logs (TODO)" : {
+
+    },
     "Export PDF" : {
 
     },
     "Failed to create report" : {
 
     },
+    "Flags" : {
+
+    },
     "Goals (placeholder)" : {
+
+    },
+    "iCloud Sync (placeholder)" : {
 
     },
     "Income" : {
@@ -89,6 +125,12 @@
 
     },
     "Kids Fund" : {
+
+    },
+    "Language" : {
+
+    },
+    "Language and iCloud toggles are UI placeholders for now. Actual localization and CloudKit sync will be wired later." : {
 
     },
     "Month" : {
@@ -112,7 +154,13 @@
     "Notes" : {
 
     },
+    "OK" : {
+
+    },
     "Outflow" : {
+
+    },
+    "Preferences" : {
 
     },
     "Recent" : {
@@ -130,10 +178,19 @@
     "Search note…" : {
 
     },
+    "Seed demo data (TODO)" : {
+
+    },
+    "Settings" : {
+
+    },
     "Share Report" : {
 
     },
     "Show cleared only" : {
+
+    },
+    "Show debug badges" : {
 
     },
     "Summary" : {
@@ -189,6 +246,9 @@
         }
       }
     },
+    "Theme" : {
+
+    },
     "This is a UI-only preview. Real data will come after we wire SwiftData." : {
 
     },
@@ -199,6 +259,12 @@
 
     },
     "Type" : {
+
+    },
+    "Verbose logs" : {
+
+    },
+    "Version" : {
 
     }
   },
