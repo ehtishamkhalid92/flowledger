@@ -34,6 +34,9 @@ enum DI {
 
     static var saveRecurring: SaveRecurringRuleUseCase = SaveRecurringRuleUC(repo: recurringRepo)
     static var runRecurringForDate: RunRecurringForDateUseCase = RunRecurringForDateUC(recurring: recurringRepo, tx: txRepo)
+    static var runSalaryAllocation: RunSalaryAllocationUseCase = RunSalaryAllocationUC(
+        accountRepo: accountRepo, txRepo: txRepo, categoryRepo: categoryRepo
+    )
 
     // MARK: - SwiftData Configuration
     static func useSwiftData(context: ModelContext) {
@@ -58,5 +61,6 @@ enum DI {
 
         saveRecurring = SaveRecurringRuleUC(repo: rec)
         runRecurringForDate = RunRecurringForDateUC(recurring: rec, tx: tx)
+        runSalaryAllocation = RunSalaryAllocationUC(accountRepo: acc, txRepo: tx, categoryRepo: cat)
     }
 }

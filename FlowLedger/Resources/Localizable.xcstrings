@@ -10,16 +10,34 @@
     "↓" : {
 
     },
+    "10" : {
+
+    },
+    "100.00" : {
+
+    },
+    "6859.00" : {
+
+    },
     "About" : {
 
     },
     "Accounts" : {
 
     },
+    "Action" : {
+
+    },
     "Active Rules" : {
 
     },
+    "Add" : {
+
+    },
     "Add Account" : {
+
+    },
+    "Add Allocation" : {
 
     },
     "Add Expense" : {
@@ -35,6 +53,12 @@
 
     },
     "All Categories" : {
+
+    },
+    "Allocations" : {
+
+    },
+    "Allocations will be created dated today from the source account." : {
 
     },
     "Amount" : {
@@ -67,6 +91,9 @@
     "Category (optional)" : {
 
     },
+    "Category name" : {
+
+    },
     "CHF 120 / mo" : {
 
     },
@@ -85,6 +112,9 @@
     "Currency" : {
 
     },
+    "Current" : {
+
+    },
     "Data" : {
 
     },
@@ -100,7 +130,13 @@
     "Emergency Fund" : {
 
     },
+    "Enter salary amount (CHF)" : {
+
+    },
     "Expense" : {
+
+    },
+    "Expense to category" : {
 
     },
     "Expenses" : {
@@ -118,10 +154,16 @@
     "Failed to create report" : {
 
     },
+    "Fixed (CHF)" : {
+
+    },
     "Flags" : {
 
     },
     "FlowLedger v1.0" : {
+
+    },
+    "From account" : {
 
     },
     "From Account" : {
@@ -151,6 +193,9 @@
     "Made with SwiftUI + SwiftData" : {
 
     },
+    "Mode" : {
+
+    },
     "Month" : {
 
     },
@@ -166,7 +211,13 @@
     "Net" : {
 
     },
+    "New Allocation" : {
+
+    },
     "New Rule" : {
+
+    },
+    "No allocations. Add one below." : {
 
     },
     "No expenses this month" : {
@@ -193,6 +244,9 @@
     "Outflow" : {
 
     },
+    "Percent" : {
+
+    },
     "Preferences" : {
 
     },
@@ -211,10 +265,19 @@
     "Reports" : {
 
     },
+    "Run" : {
+
+    },
     "Run for Today" : {
 
     },
+    "Run Now…" : {
+
+    },
     "Run Recurring Now" : {
+
+    },
+    "Salary Plan" : {
 
     },
     "Save" : {
@@ -233,6 +296,9 @@
 
     },
     "Show debug badges" : {
+
+    },
+    "Source" : {
 
     },
     "Summary" : {
@@ -291,6 +357,9 @@
         }
       }
     },
+    "Target account name" : {
+
+    },
     "Theme" : {
 
     },
@@ -304,6 +373,9 @@
 
     },
     "Transfer" : {
+
+    },
+    "Transfer to account" : {
 
     },
     "Type" : {

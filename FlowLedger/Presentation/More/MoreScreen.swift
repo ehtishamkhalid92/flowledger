@@ -64,6 +64,7 @@ struct MoreScreen: View {
 
             // MARK: Tools
             Section {
+                NavigationLink("Salary Plan", destination: SalaryPlanScreen())
                 NavigationLink("Recurring Rules", destination: RecurringListScreen())
                 NavigationLink("Developer Tools", destination: DevToolsScreen())
             } header: {
