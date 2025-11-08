@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct FlowLedgerApp: App {
@@ -15,10 +16,22 @@ struct FlowLedgerApp: App {
         AppearanceMode(rawValue: appearanceRaw) ?? .system
     }
 
+    // Build a SwiftData container (local store). Toggle `inMemory:` for UI testing if needed.
+    private let container: ModelContainer = {
+        do { return try SwiftDataStack.modelContainer(inMemory: false) }
+        catch {
+            fatalError("SwiftData container failed: \(error)")
+        }
+    }()
+
     var body: some Scene {
         WindowGroup {
-            RootTabs()
-                .preferredColorScheme(appearance.colorScheme) // system/dark/light
+            // BootstrapDI reads the ModelContext and points DI to SwiftData repos.
+            BootstrapDI {
+                RootTabs()
+                    .preferredColorScheme(appearance.colorScheme)
+            }
         }
+        .modelContainer(container)
     }
 }

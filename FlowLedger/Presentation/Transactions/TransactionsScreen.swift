@@ -135,9 +135,8 @@ struct TransactionsScreen: View {
         do {
             var q = TxQuery()
             q.month = filter.month
-            // (we keep UI-side account/category filtering by name for now)
             let domainItems = try await DI.txRepo.list(query: q)
-            txs = domainItems.map { toVM($0, accountsById: accountById, categoriesById: categoryById) }
+            txs = domainItems.map { mapToVM($0) }
                 .sorted(by: { $0.date > $1.date })
         } catch {
             print("List tx failed: \(error)")
@@ -186,6 +185,45 @@ struct TransactionsScreen: View {
                 )
             } catch { print("Transfer failed: \(error)") }
         }
+    }
+
+    // MARK: Local mapper (Domain → UI), replaces global `toVM(...)`
+
+    private func mapToVM(_ t: Transaction) -> TxVM {
+        let accName = accountById[t.accountId]?.name ?? "Account"
+        let toName  = t.counterpartyAccountId.flatMap { accountById[$0]?.name }
+        let catName = t.categoryId.flatMap { categoryById[$0]?.name }
+
+        let icon = t.categoryId
+            .flatMap { categoryById[$0]?.icon }
+            ?? {
+                switch t.kind {
+                case .expense:  return "cart.fill"
+                case .income:   return "arrow.down.circle.fill"
+                case .transfer: return "arrow.left.arrow.right"
+                }
+            }()
+
+        let vmKind: TxVM.Kind = {
+            switch t.kind {
+            case .expense:  return .expense
+            case .income:   return .income
+            case .transfer: return .transfer
+            }
+        }()
+
+        return TxVM(
+            id: t.id,
+            kind: vmKind,
+            amountCents: t.amount.cents,
+            accountName: accName,
+            toAccountName: toName,
+            categoryName: catName,
+            icon: icon,
+            note: t.note,
+            date: t.date,
+            isCleared: t.isCleared
+        )
     }
 
     // MARK: Filtering & sectioning (UI side)

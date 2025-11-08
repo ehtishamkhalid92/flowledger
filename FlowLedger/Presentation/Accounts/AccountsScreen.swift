@@ -4,7 +4,6 @@
 //
 //  Created by Ehtisham Khalid on 08.11.2025.
 //
-
 import SwiftUI
 
 struct AccountsScreen: View {
@@ -52,7 +51,7 @@ struct AccountsScreen: View {
         .task {
             do {
                 let list = try await DI.listAccounts.execute()
-                accounts = list.map(toVM)
+                accounts = list.map(mapAccountToVM)  // ← local mapper below
             } catch {
                 print("List accounts failed: \(error)")
             }

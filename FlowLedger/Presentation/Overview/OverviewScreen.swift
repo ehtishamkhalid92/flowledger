@@ -112,7 +112,7 @@ struct OverviewScreen: View {
         .task {
             do {
                 let list = try await DI.listAccounts.execute()
-                accounts = list.map(toVM)
+                accounts = list.map(mapAccountToVM)
 
                 let summary = try await DI.monthSummary.execute(month: .now)
                 incomeCents  = summary.income.cents
