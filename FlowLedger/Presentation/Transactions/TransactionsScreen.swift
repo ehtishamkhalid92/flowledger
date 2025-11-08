@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// MARK: - ViewModels (UI-only for now)
+// MARK: - ViewModels (UI-only list for now; saving goes through domain)
 
 struct TxVM: Identifiable, Hashable {
     enum Kind: String, CaseIterable { case expense, income, transfer }
@@ -25,7 +25,7 @@ struct TxVM: Identifiable, Hashable {
         switch kind {
         case .expense:  return -abs(amountCents)
         case .income:   return  abs(amountCents)
-        case .transfer: return  amountCents // neutral; we show gray
+        case .transfer: return  amountCents
         }
     }
 }
@@ -44,29 +44,19 @@ struct TransactionsScreen: View {
     @State private var filter = TxFilterState()
     @State private var showAddSheet = false
 
-    // Demo data (UI-only)
-    @State private var accounts: [String] = ["Current", "Savings", "Credit Card", "Cash"]
-    @State private var categories: [String] = ["Housing", "Car", "Insurance", "Food", "Charging", "Charity", "Parents", "Children", "Subscriptions", "Bank Fees", "Taxes", "Utilities"]
+    // Loaded from domain (names + lookup maps)
+    @State private var accounts: [String] = []
+    @State private var categories: [String] = []
+    @State private var accountIndex: [String: AccountID] = [:]
+    @State private var categoryIndex: [String: CategoryID] = [:]
+
+    // UI list still local for now; domain saving is wired
     @State private var txs: [TxVM] = [
-        .init(id: "t1", kind: .expense, amountCents: 174_400, accountName: "Current",
-              categoryName: "Housing", icon: "house.fill", note: "Rent Nov",
-              date: .now.addingTimeInterval(TimeInterval(-86400 * 5)), isCleared: true),
-
-        .init(id: "t2", kind: .expense, amountCents: 49_785, accountName: "Current",
-              categoryName: "Car", icon: "car.fill", note: "Car EMI",
-              date: .now.addingTimeInterval(TimeInterval(-86400 * 4)), isCleared: true),
-
-        .init(id: "t3", kind: .expense, amountCents: 55_850, accountName: "Current",
-              categoryName: "Insurance", icon: "stethoscope", note: "Health",
-              date: .now.addingTimeInterval(TimeInterval(-86400 * 3)), isCleared: false),
-
-        .init(id: "t4", kind: .income, amountCents: 685_900, accountName: "Current",
-              categoryName: "Salary", icon: "briefcase.fill", note: "Salary Nov",
-              date: .now.addingTimeInterval(TimeInterval(-86400 * 6)), isCleared: true),
-
-        .init(id: "t5", kind: .expense, amountCents: 20_000, accountName: "Current",
-              categoryName: "Food", icon: "fork.knife", note: "Groceries",
-              date: .now.addingTimeInterval(TimeInterval(-86400 * 1)), isCleared: false),
+        .init(id: "t1", kind: .expense, amountCents: 174_400, accountName: "Current", categoryName: "Housing", icon: "house.fill", note: "Rent Nov", date: .now.addingTimeInterval(TimeInterval(-86400*5)), isCleared: true),
+        .init(id: "t2", kind: .expense, amountCents: 49_785,  accountName: "Current", categoryName: "Car",     icon: "car.fill", note: "Car EMI", date: .now.addingTimeInterval(TimeInterval(-86400*4)), isCleared: true),
+        .init(id: "t3", kind: .expense, amountCents: 55_850,  accountName: "Current", categoryName: "Insurance", icon: "stethoscope", note: "Health", date: .now.addingTimeInterval(TimeInterval(-86400*3)), isCleared: false),
+        .init(id: "t4", kind: .income,  amountCents: 685_900, accountName: "Current", categoryName: "Salary", icon: "briefcase.fill", note: "Salary Nov", date: .now.addingTimeInterval(TimeInterval(-86400*6)), isCleared: true),
+        .init(id: "t5", kind: .expense, amountCents: 20_000,  accountName: "Current", categoryName: "Food", icon: "fork.knife", note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400*1)), isCleared: false),
         .init(id: "t6", kind: .transfer, amountCents: 70_000, accountName: "Current", categoryName: nil, icon: "arrow.left.arrow.right", note: "To Savings (EF)", date: .now, isCleared: true)
     ]
 
@@ -107,9 +97,68 @@ struct TransactionsScreen: View {
             AddTransactionSheet(
                 accounts: accounts,
                 categories: categories,
-                onSave: { newItem in txs.insert(newItem, at: 0) }
+                onSave: { newItem in
+                    Task {
+                        await saveViaDomain(newItem)
+                        txs.insert(newItem, at: 0) // optimistic UI
+                    }
+                }
             )
             .presentationDetents([.medium, .large])
+        }
+        .task {
+            await loadFilters()
+        }
+    }
+
+    // MARK: Domain wiring
+
+    private func loadFilters() async {
+        do {
+            let accs = try await DI.listAccounts.execute()
+            accounts = accs.map(\.name)
+            accountIndex = Dictionary(uniqueKeysWithValues: accs.map { ($0.name, $0.id) })
+
+            let cats = try await DI.categoryRepo.list(kind: nil)
+            categories = cats.map(\.name)
+            categoryIndex = Dictionary(uniqueKeysWithValues: cats.map { ($0.name, $0.id) })
+        } catch {
+            print("Load filters failed: \(error)")
+        }
+    }
+
+    private func saveViaDomain(_ vm: TxVM) async {
+        guard let accountId = accountIndex[vm.accountName] else { return }
+        switch vm.kind {
+        case .expense:
+            guard let catName = vm.categoryName, let catId = categoryIndex[catName] else { return }
+            do {
+                try await DI.addExpense.execute(
+                    amount: Money(cents: abs(vm.amountCents)),
+                    accountId: accountId,
+                    categoryId: catId,
+                    note: vm.note,
+                    date: vm.date,
+                    cleared: vm.isCleared
+                )
+            } catch { print("Add expense failed: \(error)") }
+
+        case .income:
+            guard let catName = vm.categoryName, let catId = categoryIndex[catName] else { return }
+            do {
+                try await DI.addIncome.execute(
+                    amount: Money(cents: abs(vm.amountCents)),
+                    accountId: accountId,
+                    categoryId: catId,
+                    note: vm.note,
+                    date: vm.date,
+                    cleared: vm.isCleared
+                )
+            } catch { print("Add income failed: \(error)") }
+
+        case .transfer:
+            // To-account picker will be added in Step 10.1, then call DI.transfer here.
+            break
         }
     }
 

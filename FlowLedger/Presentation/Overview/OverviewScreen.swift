@@ -9,13 +9,13 @@ import SwiftUI
 import Charts
 
 struct OverviewScreen: View {
-    // Temporary in-memory data
-    @State private var accounts: [AccountVM] = [
-        .init(id: "a1", name: "Current",     kind: .current,    balanceCents: 285_000, deltaCents: 12_000),
-        .init(id: "a2", name: "Savings",     kind: .savings,    balanceCents: 470_000, deltaCents: 0),
-        .init(id: "a3", name: "Credit Card", kind: .creditCard, balanceCents: -30_000, deltaCents: -5_000)
-    ]
+    // Domain-driven data
+    @State private var accounts: [AccountVM] = []
+    @State private var incomeCents: Int = 0
+    @State private var expenseCents: Int = 0
+    private var thisMonthNet: Int { incomeCents - expenseCents }
 
+    // Placeholder chart data (until SwiftData wired)
     @State private var catSpending: [(category: String, cents: Int)] = [
         ("Housing", 174_400),
         ("Car", 56_700),
@@ -24,7 +24,6 @@ struct OverviewScreen: View {
         ("Charging", 7_000)
     ]
 
-    // (month, income, expense)
     @State private var trend: [(String, Int, Int)] = [
         ("Jun", 685_900, 520_000),
         ("Jul", 685_900, 544_000),
@@ -33,10 +32,6 @@ struct OverviewScreen: View {
         ("Oct", 685_900, 575_000),
         ("Nov", 685_900, 567_161)
     ]
-
-    private var thisMonthIncome: Int { trend.last?.1 ?? 0 }
-    private var thisMonthExpense: Int { trend.last?.2 ?? 0 }
-    private var thisMonthNet: Int { thisMonthIncome - thisMonthExpense }
 
     var body: some View {
         ScrollView {
@@ -52,18 +47,18 @@ struct OverviewScreen: View {
                     }
                 }
 
-                // Quick stats (Income / Expense / Net)
+                // Quick stats
                 SectionCard {
                     AppTheme.section("This Month")
                     HStack(spacing: 24) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Income").font(.subheadline).foregroundStyle(.secondary)
-                            MoneyText(thisMonthIncome).foregroundStyle(.green)
+                            MoneyText(incomeCents).foregroundStyle(.green)
                         }
                         Divider().frame(height: 44)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Expenses").font(.subheadline).foregroundStyle(.secondary)
-                            MoneyText(thisMonthExpense).foregroundStyle(.red)
+                            MoneyText(expenseCents).foregroundStyle(.red)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
@@ -74,7 +69,7 @@ struct OverviewScreen: View {
                     }
                 }
 
-                // Donut: spending by category
+                // Donut: spending by category (placeholder)
                 SectionCard {
                     AppTheme.section("Spending by Category")
                     Chart(catSpending, id: \.category) { item in
@@ -87,7 +82,7 @@ struct OverviewScreen: View {
                     .frame(height: 200)
                 }
 
-                // Bars: income vs expense trend
+                // Bars: income vs expense (placeholder)
                 SectionCard {
                     AppTheme.section("Income vs Expense")
                     Chart {
@@ -104,7 +99,6 @@ struct OverviewScreen: View {
             .padding(16)
         }
         .background(AppTheme.bg.ignoresSafeArea())
-        .scrollIndicators(.hidden)
         .navigationTitle(String(localized: "tab.overview"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -113,6 +107,18 @@ struct OverviewScreen: View {
                     Button("Add Income", systemImage: "plus.circle.fill") {}
                     Button("Transfer", systemImage: "arrow.left.arrow.right.circle.fill") {}
                 } label: { Image(systemName: "plus.circle.fill") }
+            }
+        }
+        .task {
+            do {
+                let list = try await DI.listAccounts.execute()
+                accounts = list.map(toVM)
+
+                let summary = try await DI.monthSummary.execute(month: .now)
+                incomeCents  = summary.income.cents
+                expenseCents = summary.expense.cents
+            } catch {
+                print("Overview load failed: \(error)")
             }
         }
     }

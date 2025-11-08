@@ -8,12 +8,7 @@
 import SwiftUI
 
 struct AccountsScreen: View {
-    @State private var accounts: [AccountVM] = [
-        .init(id: "a1", name: "Current",     kind: .current,    balanceCents: 285_000, deltaCents: 12_000),
-        .init(id: "a2", name: "Savings",     kind: .savings,    balanceCents: 470_000, deltaCents: 0),
-        .init(id: "a3", name: "Credit Card", kind: .creditCard, balanceCents: -30_000, deltaCents: -5_000),
-        .init(id: "a4", name: "Cash",        kind: .cash,       balanceCents: 1_500,   deltaCents: 0)
-    ]
+    @State private var accounts: [AccountVM] = []
 
     private var totalNetCents: Int { accounts.map(\.balanceCents).reduce(0,+) }
 
@@ -45,7 +40,6 @@ struct AccountsScreen: View {
             .padding(16)
         }
         .background(AppTheme.bg.ignoresSafeArea())
-        .scrollIndicators(.hidden)
         .navigationTitle("Accounts")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -53,6 +47,14 @@ struct AccountsScreen: View {
                     Button("Add Account", systemImage: "plus") {}
                     Button("Reorder", systemImage: "arrow.up.arrow.down") {}
                 } label: { Image(systemName: "ellipsis.circle") }
+            }
+        }
+        .task {
+            do {
+                let list = try await DI.listAccounts.execute()
+                accounts = list.map(toVM)
+            } catch {
+                print("List accounts failed: \(error)")
             }
         }
     }
