@@ -1,7 +1,82 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "· %@" : {
+
+    },
+    "↑" : {
+
+    },
+    "↓" : {
+
+    },
+    "Account" : {
+
+    },
+    "Add Expense" : {
+
+    },
+    "Add Income" : {
+
+    },
+    "Add Transaction" : {
+
+    },
+    "All Accounts" : {
+
+    },
+    "All Categories" : {
+
+    },
+    "Amount" : {
+
+    },
+    "Amount (e.g. 12.50)" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Category" : {
+
+    },
+    "Cleared" : {
+
+    },
     "Coming soon" : {
+
+    },
+    "Date" : {
+
+    },
+    "Expense" : {
+
+    },
+    "Expenses" : {
+
+    },
+    "Income" : {
+
+    },
+    "Month" : {
+
+    },
+    "Net" : {
+
+    },
+    "None" : {
+
+    },
+    "Note (optional)" : {
+
+    },
+    "Save" : {
+
+    },
+    "Search note…" : {
+
+    },
+    "Show cleared only" : {
 
     },
     "tab.accounts" : {
@@ -53,6 +128,12 @@
           }
         }
       }
+    },
+    "Transfer" : {
+
+    },
+    "Type" : {
+
     }
   },
   "version" : "1.1"

@@ -10,9 +10,9 @@ import SwiftUI
 struct RootTabs: View {
     var body: some View {
         TabView {
-            NavigationStack { Placeholder(title: "Overview") }
+            NavigationStack { OverviewScreen() }
                 .tabItem { Label(String(localized: "tab.overview"), systemImage: "chart.pie.fill") }
-            NavigationStack { Placeholder(title: "Expenses") }
+            NavigationStack { TransactionsScreen() }
                 .tabItem { Label(String(localized: "tab.transactions"), systemImage: "list.bullet.rectangle") }
             NavigationStack { Placeholder(title: "Accounts") }
                 .tabItem { Label(String(localized: "tab.accounts"), systemImage: "creditcard.fill") }
