@@ -16,6 +16,7 @@ struct AddTransactionSheet: View {
 
     @State private var kind: TxVM.Kind = .expense
     @State private var account: String = ""
+    @State private var toAccount: String = ""       // only for transfers
     @State private var category: String = ""
     @State private var amountText: String = ""
     @State private var note: String = ""
@@ -30,19 +31,29 @@ struct AddTransactionSheet: View {
                         Text(k.rawValue.capitalized).tag(k)
                     }
                 }
-                Picker("Account", selection: $account) {
+
+                Picker("From Account", selection: $account) {
                     ForEach(accounts, id: \.self) { Text($0) }
                 }
-                if kind != .transfer {
+
+                if kind == .transfer {
+                    Picker("To Account", selection: $toAccount) {
+                        ForEach(accounts, id: \.self) { Text($0) }
+                    }
+                } else {
                     Picker("Category", selection: $category) {
                         Text("None").tag("")
                         ForEach(categories, id: \.self) { Text($0) }
                     }
                 }
+
                 TextField("Amount (e.g. 12.50)", text: $amountText)
                     .keyboardType(.decimalPad)
+
                 TextField("Note (optional)", text: $note)
+
                 DatePicker("Date", selection: $date, displayedComponents: .date)
+
                 Toggle("Cleared", isOn: $isCleared)
             }
             .navigationTitle("Add Transaction")
@@ -56,14 +67,15 @@ struct AddTransactionSheet: View {
             }
             .onAppear {
                 account = accounts.first ?? ""
+                toAccount = accounts.dropFirst().first ?? accounts.first ?? ""
             }
         }
     }
 
     private var canSave: Bool {
         guard !account.isEmpty, let _ = cents(from: amountText) else { return false }
-        if kind != .transfer, category.isEmpty { return false }
-        return true
+        if kind == .transfer { return !toAccount.isEmpty && toAccount != account }
+        return !category.isEmpty
     }
 
     private func save() {
@@ -81,6 +93,7 @@ struct AddTransactionSheet: View {
             kind: kind,
             amountCents: amount,
             accountName: account,
+            toAccountName: kind == .transfer ? toAccount : nil,
             categoryName: kind == .transfer ? nil : category,
             icon: icon,
             note: note.isEmpty ? nil : note,

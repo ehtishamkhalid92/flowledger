@@ -13,9 +13,6 @@
     "About" : {
 
     },
-    "Account" : {
-
-    },
     "Accounts" : {
 
     },
@@ -110,6 +107,9 @@
 
     },
     "Flags" : {
+
+    },
+    "From Account" : {
 
     },
     "Goals (placeholder)" : {
@@ -249,7 +249,7 @@
     "Theme" : {
 
     },
-    "This is a UI-only preview. Real data will come after we wire SwiftData." : {
+    "To Account" : {
 
     },
     "Top Categories" : {
@@ -259,6 +259,9 @@
 
     },
     "Type" : {
+
+    },
+    "UI-only preview. We’ll replace this with SwiftData-backed data." : {
 
     },
     "Verbose logs" : {

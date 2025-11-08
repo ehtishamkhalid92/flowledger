@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// MARK: - ViewModels (UI-only list for now; saving goes through domain)
+// MARK: - ViewModels
 
 struct TxVM: Identifiable, Hashable {
     enum Kind: String, CaseIterable { case expense, income, transfer }
@@ -15,7 +15,8 @@ struct TxVM: Identifiable, Hashable {
     let kind: Kind
     let amountCents: Int
     let accountName: String
-    let categoryName: String?
+    let toAccountName: String?       // populated for transfers
+    let categoryName: String?        // nil for transfers
     let icon: String
     let note: String?
     let date: Date
@@ -44,21 +45,16 @@ struct TransactionsScreen: View {
     @State private var filter = TxFilterState()
     @State private var showAddSheet = false
 
-    // Loaded from domain (names + lookup maps)
+    // Lookups from domain
     @State private var accounts: [String] = []
     @State private var categories: [String] = []
-    @State private var accountIndex: [String: AccountID] = [:]
-    @State private var categoryIndex: [String: CategoryID] = [:]
+    @State private var accountByName: [String: AccountID] = [:]
+    @State private var accountById: [AccountID: Account] = [:]
+    @State private var categoryByName: [String: CategoryID] = [:]
+    @State private var categoryById: [CategoryID: Category] = [:]
 
-    // UI list still local for now; domain saving is wired
-    @State private var txs: [TxVM] = [
-        .init(id: "t1", kind: .expense, amountCents: 174_400, accountName: "Current", categoryName: "Housing", icon: "house.fill", note: "Rent Nov", date: .now.addingTimeInterval(TimeInterval(-86400*5)), isCleared: true),
-        .init(id: "t2", kind: .expense, amountCents: 49_785,  accountName: "Current", categoryName: "Car",     icon: "car.fill", note: "Car EMI", date: .now.addingTimeInterval(TimeInterval(-86400*4)), isCleared: true),
-        .init(id: "t3", kind: .expense, amountCents: 55_850,  accountName: "Current", categoryName: "Insurance", icon: "stethoscope", note: "Health", date: .now.addingTimeInterval(TimeInterval(-86400*3)), isCleared: false),
-        .init(id: "t4", kind: .income,  amountCents: 685_900, accountName: "Current", categoryName: "Salary", icon: "briefcase.fill", note: "Salary Nov", date: .now.addingTimeInterval(TimeInterval(-86400*6)), isCleared: true),
-        .init(id: "t5", kind: .expense, amountCents: 20_000,  accountName: "Current", categoryName: "Food", icon: "fork.knife", note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400*1)), isCleared: false),
-        .init(id: "t6", kind: .transfer, amountCents: 70_000, accountName: "Current", categoryName: nil, icon: "arrow.left.arrow.right", note: "To Savings (EF)", date: .now, isCleared: true)
-    ]
+    // Repo-backed list (we still apply UI-side filters)
+    @State private var txs: [TxVM] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,42 +96,63 @@ struct TransactionsScreen: View {
                 onSave: { newItem in
                     Task {
                         await saveViaDomain(newItem)
-                        txs.insert(newItem, at: 0) // optimistic UI
+                        await reloadFromRepo()
                     }
                 }
             )
             .presentationDetents([.medium, .large])
         }
         .task {
-            await loadFilters()
+            await loadLookups()
+            await reloadFromRepo()
+        }
+        .onChange(of: filter.month) { _ in
+            Task { await reloadFromRepo() }
         }
     }
 
     // MARK: Domain wiring
 
-    private func loadFilters() async {
+    private func loadLookups() async {
         do {
+            // Accounts
             let accs = try await DI.listAccounts.execute()
             accounts = accs.map(\.name)
-            accountIndex = Dictionary(uniqueKeysWithValues: accs.map { ($0.name, $0.id) })
+            accountByName = Dictionary(uniqueKeysWithValues: accs.map { ($0.name, $0.id) })
+            accountById   = Dictionary(uniqueKeysWithValues: accs.map { ($0.id, $0) })
 
+            // Categories
             let cats = try await DI.categoryRepo.list(kind: nil)
             categories = cats.map(\.name)
-            categoryIndex = Dictionary(uniqueKeysWithValues: cats.map { ($0.name, $0.id) })
+            categoryByName = Dictionary(uniqueKeysWithValues: cats.map { ($0.name, $0.id) })
+            categoryById   = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
         } catch {
-            print("Load filters failed: \(error)")
+            print("Load lookups failed: \(error)")
+        }
+    }
+
+    private func reloadFromRepo() async {
+        do {
+            var q = TxQuery()
+            q.month = filter.month
+            // (we keep UI-side account/category filtering by name for now)
+            let domainItems = try await DI.txRepo.list(query: q)
+            txs = domainItems.map { toVM($0, accountsById: accountById, categoriesById: categoryById) }
+                .sorted(by: { $0.date > $1.date })
+        } catch {
+            print("List tx failed: \(error)")
         }
     }
 
     private func saveViaDomain(_ vm: TxVM) async {
-        guard let accountId = accountIndex[vm.accountName] else { return }
+        guard let fromId = accountByName[vm.accountName] else { return }
         switch vm.kind {
         case .expense:
-            guard let catName = vm.categoryName, let catId = categoryIndex[catName] else { return }
+            guard let catName = vm.categoryName, let catId = categoryByName[catName] else { return }
             do {
                 try await DI.addExpense.execute(
                     amount: Money(cents: abs(vm.amountCents)),
-                    accountId: accountId,
+                    accountId: fromId,
                     categoryId: catId,
                     note: vm.note,
                     date: vm.date,
@@ -144,11 +161,11 @@ struct TransactionsScreen: View {
             } catch { print("Add expense failed: \(error)") }
 
         case .income:
-            guard let catName = vm.categoryName, let catId = categoryIndex[catName] else { return }
+            guard let catName = vm.categoryName, let catId = categoryByName[catName] else { return }
             do {
                 try await DI.addIncome.execute(
                     amount: Money(cents: abs(vm.amountCents)),
-                    accountId: accountId,
+                    accountId: fromId,
                     categoryId: catId,
                     note: vm.note,
                     date: vm.date,
@@ -157,18 +174,27 @@ struct TransactionsScreen: View {
             } catch { print("Add income failed: \(error)") }
 
         case .transfer:
-            // To-account picker will be added in Step 10.1, then call DI.transfer here.
-            break
+            guard let toName = vm.toAccountName, let toId = accountByName[toName] else { return }
+            do {
+                try await DI.transfer.execute(
+                    amount: Money(cents: abs(vm.amountCents)),
+                    from: fromId,
+                    to: toId,
+                    note: vm.note,
+                    date: vm.date,
+                    cleared: vm.isCleared
+                )
+            } catch { print("Transfer failed: \(error)") }
         }
     }
 
-    // MARK: Filtering & sectioning
+    // MARK: Filtering & sectioning (UI side)
 
     private func filtered(txs: [TxVM]) -> [TxVM] {
         let (start, end) = monthBounds(for: filter.month)
         return txs.filter { t in
             (t.date >= start && t.date < end)
-            && (filter.account == nil || t.accountName == filter.account)
+            && (filter.account == nil || t.accountName == filter.account || t.toAccountName == filter.account)
             && (filter.category == nil || t.categoryName == filter.category)
             && (filter.search.isEmpty || t.note?.localizedCaseInsensitiveContains(filter.search) == true)
             && (!filter.showClearedOnly || t.isCleared)

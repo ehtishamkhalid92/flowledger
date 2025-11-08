@@ -12,14 +12,37 @@ struct ReportsScreen: View {
     @State private var shareURL: URL? = nil
     @State private var showingShare = false
 
-    // Demo data (reuse your TxVM model semantics)
+    // Demo data using current TxVM shape (includes toAccountName)
     @State private var txs: [TxVM] = [
-        .init(id: "t1", kind: .income,  amountCents: 685_900, accountName: "Current", categoryName: "Salary", icon: "briefcase.fill", note: "Salary", date: .now.addingTimeInterval(TimeInterval(-86400*6)), isCleared: true),
-        .init(id: "t2", kind: .expense, amountCents: 174_400, accountName: "Current", categoryName: "Housing", icon: "house.fill", note: "Rent", date: .now.addingTimeInterval(TimeInterval(-86400*5)), isCleared: true),
-        .init(id: "t3", kind: .expense, amountCents: 49_785,  accountName: "Current", categoryName: "Car", icon: "car.fill", note: "EMI", date: .now.addingTimeInterval(TimeInterval(-86400*4)), isCleared: true),
-        .init(id: "t4", kind: .expense, amountCents: 55_850,  accountName: "Current", categoryName: "Insurance", icon: "stethoscope", note: "Health", date: .now.addingTimeInterval(TimeInterval(-86400*3)), isCleared: false),
-        .init(id: "t5", kind: .expense, amountCents: 20_000,  accountName: "Current", categoryName: "Food", icon: "fork.knife", note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400*1)), isCleared: false),
-        .init(id: "t6", kind: .transfer, amountCents: 70_000, accountName: "Current", categoryName: nil, icon: "arrow.left.arrow.right", note: "To Savings (EF)", date: .now, isCleared: true)
+        .init(id: "t1", kind: .income,  amountCents: 685_900,
+              accountName: "Current", toAccountName: nil,
+              categoryName: "Salary", icon: "briefcase.fill",
+              note: "Salary", date: .now.addingTimeInterval(TimeInterval(-86400*6)), isCleared: true),
+
+        .init(id: "t2", kind: .expense, amountCents: 174_400,
+              accountName: "Current", toAccountName: nil,
+              categoryName: "Housing", icon: "house.fill",
+              note: "Rent", date: .now.addingTimeInterval(TimeInterval(-86400*5)), isCleared: true),
+
+        .init(id: "t3", kind: .expense, amountCents: 49_785,
+              accountName: "Current", toAccountName: nil,
+              categoryName: "Car", icon: "car.fill",
+              note: "EMI", date: .now.addingTimeInterval(TimeInterval(-86400*4)), isCleared: true),
+
+        .init(id: "t4", kind: .expense, amountCents: 55_850,
+              accountName: "Current", toAccountName: nil,
+              categoryName: "Insurance", icon: "stethoscope",
+              note: "Health", date: .now.addingTimeInterval(TimeInterval(-86400*3)), isCleared: false),
+
+        .init(id: "t5", kind: .expense, amountCents: 20_000,
+              accountName: "Current", toAccountName: nil,
+              categoryName: "Food", icon: "fork.knife",
+              note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400*1)), isCleared: false),
+
+        .init(id: "t6", kind: .transfer, amountCents: 70_000,
+              accountName: "Current", toAccountName: "Savings",
+              categoryName: nil, icon: "arrow.left.arrow.right",
+              note: "To Savings (EF)", date: .now, isCleared: true)
     ]
 
     private var monthTx: [TxVM] {
@@ -33,7 +56,8 @@ struct ReportsScreen: View {
     private var topCategories: [(String, Int)] {
         let items = monthTx.filter { $0.kind == .expense }
         let grouped = Dictionary(grouping: items, by: { $0.categoryName ?? "Other" })
-        return grouped.map { (k, v) in (k, v.map(\.amountCents).reduce(0,+)) }
+        return grouped
+            .map { (k, v) in (k, v.map(\.amountCents).reduce(0,+)) }
             .sorted(by: { $0.1 > $1.1 })
             .prefix(5)
             .map { ($0.0, $0.1) }
@@ -88,7 +112,7 @@ struct ReportsScreen: View {
             }
 
             Section("Notes") {
-                Text("This is a UI-only preview. Real data will come after we wire SwiftData.")
+                Text("UI-only preview. We’ll replace this with SwiftData-backed data.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -119,7 +143,11 @@ struct ReportsScreen: View {
         ]
 
         do {
-            let url = try PDFExporter.makePDFFile(fileName: "FlowLedger-\(monthTitle)", title: "FlowLedger Monthly Report — \(monthTitle)", blocks: blocks)
+            let url = try PDFExporter.makePDFFile(
+                fileName: "FlowLedger-\(monthTitle)",
+                title: "FlowLedger Monthly Report — \(monthTitle)",
+                blocks: blocks
+            )
             shareURL = url
             showingShare = true
         } catch {
@@ -132,7 +160,7 @@ struct ReportsScreen: View {
         let f = NumberFormatter()
         f.numberStyle = .currency
         f.currencyCode = "CHF"
-        return f.string(from: NSNumber(value: Double(cents)/100.0)) ?? "CHF 0.00"
+        return f.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "CHF 0.00"
     }
 
     private func monthBounds(for date: Date) -> (Date, Date) {
