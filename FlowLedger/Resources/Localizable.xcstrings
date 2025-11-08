@@ -13,6 +13,12 @@
     "Account" : {
 
     },
+    "Accounts" : {
+
+    },
+    "Add Account" : {
+
+    },
     "Add Expense" : {
 
     },
@@ -34,10 +40,19 @@
     "Amount (e.g. 12.50)" : {
 
     },
+    "Balance" : {
+
+    },
     "Cancel" : {
 
     },
     "Category" : {
+
+    },
+    "CHF 120 / mo" : {
+
+    },
+    "CHF 700 / mo" : {
 
     },
     "Cleared" : {
@@ -49,13 +64,25 @@
     "Date" : {
 
     },
+    "Emergency Fund" : {
+
+    },
     "Expense" : {
 
     },
     "Expenses" : {
 
     },
+    "Goals (placeholder)" : {
+
+    },
     "Income" : {
+
+    },
+    "Inflow" : {
+
+    },
+    "Kids Fund" : {
 
     },
     "Month" : {
@@ -64,10 +91,22 @@
     "Net" : {
 
     },
+    "No transactions yet" : {
+
+    },
     "None" : {
 
     },
     "Note (optional)" : {
+
+    },
+    "Outflow" : {
+
+    },
+    "Recent" : {
+
+    },
+    "Reorder" : {
 
     },
     "Save" : {
