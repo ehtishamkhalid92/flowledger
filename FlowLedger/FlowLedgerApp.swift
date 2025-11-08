@@ -10,28 +10,36 @@ import SwiftData
 
 @main
 struct FlowLedgerApp: App {
-    @AppStorage(AppSettings.Keys.appearance) private var appearanceRaw: String = AppearanceMode.system.rawValue
+    @Environment(\.scenePhase) private var scenePhase
 
-    private var appearance: AppearanceMode {
-        AppearanceMode(rawValue: appearanceRaw) ?? .system
-    }
-
-    // Build a SwiftData container (local store). Toggle `inMemory:` for UI testing if needed.
+    // SwiftData container
     private let container: ModelContainer = {
-        do { return try SwiftDataStack.modelContainer(inMemory: false) }
-        catch {
-            fatalError("SwiftData container failed: \(error)")
-        }
+        let schema = Schema([
+            AccountEntity.self,
+            CategoryEntity.self,
+            TransactionEntity.self,
+            RecurringRuleEntity.self
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        return try! ModelContainer(for: schema, configurations: [config])
     }()
+
+    init() {
+        // Boot DI with SwiftData context
+        DI.useSwiftData(context: ModelContext(container))
+    }
 
     var body: some Scene {
         WindowGroup {
-            // BootstrapDI reads the ModelContext and points DI to SwiftData repos.
-            BootstrapDI {
+            AppAppearanceView {       // applies theme from AppSettings
                 RootTabs()
-                    .preferredColorScheme(appearance.colorScheme)
             }
         }
         .modelContainer(container)
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                RecurringRunner.runIfNeededToday()
+            }
+        }
     }
 }
