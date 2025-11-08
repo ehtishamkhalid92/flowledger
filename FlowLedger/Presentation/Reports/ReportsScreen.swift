@@ -12,38 +12,12 @@ struct ReportsScreen: View {
     @State private var shareURL: URL? = nil
     @State private var showingShare = false
 
-    // Demo data using current TxVM shape (includes toAccountName)
-    @State private var txs: [TxVM] = [
-        .init(id: "t1", kind: .income,  amountCents: 685_900,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Salary", icon: "briefcase.fill",
-              note: "Salary", date: .now.addingTimeInterval(TimeInterval(-86400*6)), isCleared: true),
+    // Lookups
+    @State private var accountById: [AccountID: Account] = [:]
+    @State private var categoryById: [CategoryID: Category] = [:]
 
-        .init(id: "t2", kind: .expense, amountCents: 174_400,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Housing", icon: "house.fill",
-              note: "Rent", date: .now.addingTimeInterval(TimeInterval(-86400*5)), isCleared: true),
-
-        .init(id: "t3", kind: .expense, amountCents: 49_785,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Car", icon: "car.fill",
-              note: "EMI", date: .now.addingTimeInterval(TimeInterval(-86400*4)), isCleared: true),
-
-        .init(id: "t4", kind: .expense, amountCents: 55_850,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Insurance", icon: "stethoscope",
-              note: "Health", date: .now.addingTimeInterval(TimeInterval(-86400*3)), isCleared: false),
-
-        .init(id: "t5", kind: .expense, amountCents: 20_000,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Food", icon: "fork.knife",
-              note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400*1)), isCleared: false),
-
-        .init(id: "t6", kind: .transfer, amountCents: 70_000,
-              accountName: "Current", toAccountName: "Savings",
-              categoryName: nil, icon: "arrow.left.arrow.right",
-              note: "To Savings (EF)", date: .now, isCleared: true)
-    ]
+    // Data
+    @State private var txs: [TxVM] = []
 
     private var monthTx: [TxVM] {
         let (start, end) = monthBounds(for: month)
@@ -112,7 +86,7 @@ struct ReportsScreen: View {
             }
 
             Section("Notes") {
-                Text("UI-only preview. We’ll replace this with SwiftData-backed data.")
+                Text("SwiftData-backed report for the selected month.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -127,9 +101,41 @@ struct ReportsScreen: View {
                 Text("Failed to create report").padding()
             }
         }
+        .task {
+            await loadLookups()
+            await reload()
+        }
+        .onChange(of: month) { _ in
+            Task { await reload() }
+        }
     }
 
-    // MARK: Helpers
+    // MARK: Data
+
+    private func loadLookups() async {
+        do {
+            let accs = try await DI.listAccounts.execute()
+            accountById = Dictionary(uniqueKeysWithValues: accs.map { ($0.id, $0) })
+
+            let cats = try await DI.categoryRepo.list(kind: nil)
+            categoryById = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
+        } catch {
+            print("Reports lookups failed: \(error)")
+        }
+    }
+
+    private func reload() async {
+        do {
+            var q = TxQuery()
+            q.month = month
+            let domainItems = try await DI.txRepo.list(query: q)
+            txs = domainItems.map { mapTransactionToVM($0, accountsById: accountById, categoriesById: categoryById) }
+        } catch {
+            print("Reports load failed: \(error)")
+        }
+    }
+
+    // MARK: PDF
 
     private func exportPDF() {
         let monthTitle = month.formatted(.dateTime.month().year())
@@ -155,6 +161,8 @@ struct ReportsScreen: View {
             showingShare = true
         }
     }
+
+    // MARK: Helpers
 
     private func formatCHF(_ cents: Int) -> String {
         let f = NumberFormatter()

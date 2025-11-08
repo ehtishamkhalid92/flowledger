@@ -10,44 +10,12 @@ import SwiftUI
 struct AccountDetailScreen: View {
     let account: AccountVM
 
-    // Demo transactions (match current TxVM: includes toAccountName)
-    @State private var allTx: [TxVM] = [
-        .init(id: "t1", kind: .income,  amountCents: 685_900,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Salary", icon: "briefcase.fill",
-              note: "Salary Nov", date: .now.addingTimeInterval(TimeInterval(-86400 * 6)), isCleared: true),
+    // Lookups
+    @State private var accountById: [AccountID: Account] = [:]
+    @State private var categoryById: [CategoryID: Category] = [:]
 
-        .init(id: "t2", kind: .expense, amountCents: 174_400,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Housing", icon: "house.fill",
-              note: "Rent", date: .now.addingTimeInterval(TimeInterval(-86400 * 5)), isCleared: true),
-
-        .init(id: "t3", kind: .expense, amountCents: 49_785,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Car", icon: "car.fill",
-              note: "EMI", date: .now.addingTimeInterval(TimeInterval(-86400 * 4)), isCleared: true),
-
-        .init(id: "t4", kind: .expense, amountCents: 20_000,
-              accountName: "Current", toAccountName: nil,
-              categoryName: "Food", icon: "fork.knife",
-              note: "Groceries", date: .now.addingTimeInterval(TimeInterval(-86400 * 1)), isCleared: false),
-
-        .init(id: "t5", kind: .transfer, amountCents: 70_000,
-              accountName: "Current", toAccountName: "Savings",
-              categoryName: nil, icon: "arrow.left.arrow.right",
-              note: "To Savings (EF)", date: .now, isCleared: true),
-
-        .init(id: "s1", kind: .transfer, amountCents: 70_000,
-              accountName: "Savings", toAccountName: nil,
-              categoryName: nil, icon: "arrow.left.arrow.right",
-              note: "From Current (EF)", date: .now, isCleared: true),
-
-        .init(id: "cc1", kind: .expense, amountCents: 12_999,
-              accountName: "Credit Card", toAccountName: nil,
-              categoryName: "Subscriptions", icon: "rectangle.stack.person.crop",
-              note: "Tesla", date: .now.addingTimeInterval(TimeInterval(-86400 * 2)), isCleared: true)
-    ]
-
+    // Data
+    @State private var allTx: [TxVM] = []
     @State private var showClearedOnly = false
 
     private var txForAccount: [TxVM] {
@@ -123,5 +91,35 @@ struct AccountDetailScreen: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle(account.name)
+        .task {
+            await loadLookups()
+            await reload()
+        }
+        .onChange(of: showClearedOnly) { _ in } // keeps state-driven refresh local
+    }
+
+    // MARK: Data
+
+    private func loadLookups() async {
+        do {
+            let accs = try await DI.listAccounts.execute()
+            accountById = Dictionary(uniqueKeysWithValues: accs.map { ($0.id, $0) })
+
+            let cats = try await DI.categoryRepo.list(kind: nil)
+            categoryById = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
+        } catch {
+            print("AccountDetail lookups failed: \(error)")
+        }
+    }
+
+    private func reload() async {
+        do {
+            var q = TxQuery()
+            q.accountId = account.id
+            let domainItems = try await DI.txRepo.list(query: q)
+            allTx = domainItems.map { mapTransactionToVM($0, accountsById: accountById, categoriesById: categoryById) }
+        } catch {
+            print("AccountDetail list failed: \(error)")
+        }
     }
 }

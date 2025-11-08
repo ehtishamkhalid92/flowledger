@@ -196,6 +196,9 @@
     "Summary" : {
 
     },
+    "SwiftData-backed report for the selected month." : {
+
+    },
     "tab.accounts" : {
       "localizations" : {
         "en" : {
@@ -259,9 +262,6 @@
 
     },
     "Type" : {
-
-    },
-    "UI-only preview. We’ll replace this with SwiftData-backed data." : {
 
     },
     "Verbose logs" : {
