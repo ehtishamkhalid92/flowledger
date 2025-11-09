@@ -7,38 +7,6 @@
 
 import SwiftUI
 
-// MARK: - ViewModels
-
-struct TxVM: Identifiable, Hashable {
-    enum Kind: String, CaseIterable { case expense, income, transfer }
-    let id: String
-    let kind: Kind
-    let amountCents: Int
-    let accountName: String
-    let toAccountName: String?       // populated for transfers
-    let categoryName: String?        // nil for transfers
-    let icon: String
-    let note: String?
-    let date: Date
-    let isCleared: Bool
-
-    var signedAmount: Int {
-        switch kind {
-        case .expense:  return -abs(amountCents)
-        case .income:   return  abs(amountCents)
-        case .transfer: return  amountCents
-        }
-    }
-}
-
-struct TxFilterState: Equatable {
-    var month: Date = .now
-    var account: String? = nil
-    var category: String? = nil
-    var search: String = ""
-    var showClearedOnly: Bool = false
-}
-
 // MARK: - Screen
 
 struct TransactionsScreen: View {
@@ -121,8 +89,8 @@ struct TransactionsScreen: View {
             accountByName = Dictionary(uniqueKeysWithValues: accs.map { ($0.name, $0.id) })
             accountById   = Dictionary(uniqueKeysWithValues: accs.map { ($0.id, $0) })
 
-            // Categories
-            let cats = try await DI.categoryRepo.list(kind: nil)
+            // Categories (typed nil so the correct overload is chosen)
+            let cats = try await DI.categoryRepo.list(kind: nil as CategoryKind?)
             categories = cats.map(\.name)
             categoryByName = Dictionary(uniqueKeysWithValues: cats.map { ($0.name, $0.id) })
             categoryById   = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
@@ -136,7 +104,8 @@ struct TransactionsScreen: View {
             var q = TxQuery()
             q.month = filter.month
             let domainItems = try await DI.txRepo.list(query: q)
-            txs = domainItems.map { mapToVM($0) }
+            txs = domainItems
+                .map { mapToVM($0) }
                 .sorted(by: { $0.date > $1.date })
         } catch {
             print("List tx failed: \(error)")
@@ -187,7 +156,7 @@ struct TransactionsScreen: View {
         }
     }
 
-    // MARK: Local mapper (Domain → UI), replaces global `toVM(...)`
+    // MARK: Local mapper (Domain → UI)
 
     private func mapToVM(_ t: Transaction) -> TxVM {
         let accName = accountById[t.accountId]?.name ?? "Account"
@@ -245,11 +214,20 @@ struct TransactionsScreen: View {
     private func sectioned(txs: [TxVM]) -> [Sectioned] {
         let df = DateFormatter()
         df.dateFormat = "LLLL yyyy"
-        let groups = Dictionary(grouping: txs) { Calendar.current.dateInterval(of: .month, for: $0.date) ?? DateInterval(start: .distantPast, end: .distantFuture) }
-        return groups.keys.sorted(by: { $0.start > $1.start }).map { interval in
-            let key = String(df.string(from: interval.start).prefix(20))
-            return Sectioned(monthId: key, monthTitle: key, items: groups[interval]!.sorted(by: { $0.date > $1.date }))
+        let groups = Dictionary(grouping: txs) {
+            Calendar.current.dateInterval(of: .month, for: $0.date)
+            ?? DateInterval(start: .distantPast, end: .distantFuture)
         }
+        return groups.keys
+            .sorted(by: { $0.start > $1.start })
+            .map { interval in
+                let key = String(df.string(from: interval.start).prefix(20))
+                return Sectioned(
+                    monthId: key,
+                    monthTitle: key,
+                    items: groups[interval]!.sorted(by: { $0.date > $1.date })
+                )
+            }
     }
 
     private func monthBounds(for date: Date) -> (Date, Date) {

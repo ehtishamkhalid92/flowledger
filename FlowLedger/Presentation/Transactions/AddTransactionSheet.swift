@@ -8,53 +8,85 @@
 import SwiftUI
 
 struct AddTransactionSheet: View {
-    let accounts: [String]
-    let categories: [String]
+    // Inputs from parent
+    var accounts: [String]
+    var categories: [String]
     var onSave: (TxVM) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var kind: TxVM.Kind = .expense
-    @State private var account: String = ""
-    @State private var toAccount: String = ""       // only for transfers
-    @State private var category: String = ""
+    // Form state
+    @State private var kindIndex: Int = 0 // 0=expense, 1=income, 2=transfer
     @State private var amountText: String = ""
+    @State private var fromAccount: String = ""
+    @State private var toAccount: String = ""
+    @State private var category: String = ""
     @State private var note: String = ""
-    @State private var date: Date = .now
+    @State private var date: Date = Date()
     @State private var isCleared: Bool = true
+
+    // Derived
+    private var isTransfer: Bool { kindIndex == 2 }
+    private var isIncome: Bool { kindIndex == 1 }
+    private var isExpense: Bool { kindIndex == 0 }
+
+    private var saveEnabled: Bool {
+        let cents = parseCents(amountText)
+        guard cents > 0 else { return false }
+        guard accounts.contains(fromAccount) else { return false }
+        if isTransfer {
+            return accounts.contains(toAccount) && toAccount != fromAccount
+        } else {
+            return !category.isEmpty && categories.contains(category)
+        }
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Type", selection: $kind) {
-                    ForEach(TxVM.Kind.allCases, id: \.self) { k in
-                        Text(k.rawValue.capitalized).tag(k)
+                Section("Type & Amount") {
+                    Picker("Type", selection: $kindIndex) {
+                        Text("Expense").tag(0)
+                        Text("Income").tag(1)
+                        Text("Transfer").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+
+                    HStack {
+                        Text("Amount")
+                        Spacer()
+                        TextField("0.00", text: $amountText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
                     }
                 }
 
-                Picker("From Account", selection: $account) {
-                    ForEach(accounts, id: \.self) { Text($0) }
-                }
-
-                if kind == .transfer {
-                    Picker("To Account", selection: $toAccount) {
-                        ForEach(accounts, id: \.self) { Text($0) }
+                Section("Accounts") {
+                    Picker("From", selection: $fromAccount) {
+                        ForEach(accounts, id: \.self) { Text($0).tag($0) }
                     }
-                } else {
-                    Picker("Category", selection: $category) {
-                        Text("None").tag("")
-                        ForEach(categories, id: \.self) { Text($0) }
+                    if isTransfer {
+                        Picker("To", selection: $toAccount) {
+                            ForEach(accounts, id: \.self) { Text($0).tag($0) }
+                        }
                     }
                 }
 
-                TextField("Amount (e.g. 12.50)", text: $amountText)
-                    .keyboardType(.decimalPad)
+                if !isTransfer {
+                    Section("Category") {
+                        Picker("Category", selection: $category) {
+                            ForEach(categories, id: \.self) { Text($0).tag($0) }
+                        }
+                    }
+                }
 
-                TextField("Note (optional)", text: $note)
-
-                DatePicker("Date", selection: $date, displayedComponents: .date)
-
-                Toggle("Cleared", isOn: $isCleared)
+                Section("Details") {
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    Toggle("Cleared", isOn: $isCleared)
+                    TextField("Note (optional)", text: $note)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                }
             }
             .navigationTitle("Add Transaction")
             .toolbar {
@@ -62,51 +94,70 @@ struct AddTransactionSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(!canSave)
+                    Button("Save") { save() }
+                        .disabled(!saveEnabled)
                 }
             }
-            .onAppear {
-                account = accounts.first ?? ""
-                toAccount = accounts.dropFirst().first ?? accounts.first ?? ""
-            }
+            .onAppear(perform: seedDefaults)
         }
     }
 
-    private var canSave: Bool {
-        guard !account.isEmpty, let _ = cents(from: amountText) else { return false }
-        if kind == .transfer { return !toAccount.isEmpty && toAccount != account }
-        return !category.isEmpty
+    // MARK: - Actions
+
+    private func seedDefaults() {
+        if fromAccount.isEmpty, let first = accounts.first { fromAccount = first }
+        if toAccount.isEmpty, let second = accounts.dropFirst().first ?? accounts.first { toAccount = second }
+        if category.isEmpty, let cat = categories.first { category = cat }
     }
 
     private func save() {
-        guard let amount = cents(from: amountText) else { return }
-        let icon: String = {
-            switch kind {
-            case .expense:  return "cart.fill"
-            case .income:   return "arrow.down.circle.fill"
-            case .transfer: return "arrow.left.arrow.right"
+        let cents = parseCents(amountText)
+        guard cents > 0 else { return }
+
+        let kind: TxVM.Kind = {
+            switch kindIndex {
+            case 0: return .expense
+            case 1: return .income
+            default: return .transfer
             }
         }()
 
         let vm = TxVM(
             id: UUID().uuidString,
             kind: kind,
-            amountCents: amount,
-            accountName: account,
-            toAccountName: kind == .transfer ? toAccount : nil,
-            categoryName: kind == .transfer ? nil : category,
-            icon: icon,
+            amountCents: cents,
+            accountName: fromAccount,
+            toAccountName: isTransfer ? toAccount : nil,
+            categoryName: isTransfer ? nil : category,
+            icon: iconFor(kind),
             note: note.isEmpty ? nil : note,
             date: date,
             isCleared: isCleared
         )
+
         onSave(vm)
         dismiss()
     }
 
-    private func cents(from text: String) -> Int? {
-        let normalized = text.replacingOccurrences(of: ",", with: ".")
-        guard let d = Double(normalized) else { return nil }
-        return Int((d * 100.0).rounded())
+    // MARK: - Helpers
+
+    private func parseCents(_ s: String) -> Int {
+        let cleaned = s
+            .replacingOccurrences(of: "CHF", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: "’", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let v = Double(cleaned) { return max(0, Int((v * 100.0).rounded())) }
+        return 0
+    }
+
+    private func iconFor(_ kind: TxVM.Kind) -> String {
+        switch kind {
+        case .expense:  return "minus.circle.fill"
+        case .income:   return "plus.circle.fill"
+        case .transfer: return "arrow.left.arrow.right.circle.fill"
+        }
     }
 }

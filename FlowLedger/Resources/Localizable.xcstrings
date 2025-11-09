@@ -10,6 +10,9 @@
     "↓" : {
 
     },
+    "0.00" : {
+
+    },
     "10" : {
 
     },
@@ -62,9 +65,6 @@
 
     },
     "Amount" : {
-
-    },
-    "Amount (e.g. 12.50)" : {
 
     },
     "Amount (e.g. 1200.00)" : {
@@ -121,6 +121,9 @@
     "Date" : {
 
     },
+    "Details" : {
+
+    },
     "Developer Options" : {
 
     },
@@ -161,6 +164,9 @@
 
     },
     "FlowLedger v1.0" : {
+
+    },
+    "From" : {
 
     },
     "From account" : {
@@ -227,9 +233,6 @@
 
     },
     "No transactions yet" : {
-
-    },
-    "None" : {
 
     },
     "Note (optional)" : {
@@ -363,6 +366,9 @@
     "Theme" : {
 
     },
+    "To" : {
+
+    },
     "To Account" : {
 
     },
@@ -379,6 +385,9 @@
 
     },
     "Type" : {
+
+    },
+    "Type & Amount" : {
 
     },
     "Verbose logs" : {
