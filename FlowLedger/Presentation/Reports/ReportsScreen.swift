@@ -2,179 +2,254 @@
 //  ReportsScreen.swift
 //  FlowLedger
 //
-//  Created by Ehtisham Khalid on 08.11.2025.
-//
 
 import SwiftUI
 
 struct ReportsScreen: View {
-    @State private var month: Date = .now
-    @State private var shareURL: URL? = nil
-    @State private var showingShare = false
+    // Persist month selection
+    @AppStorage("reports.monthISO") private var storedMonthISO: String = ""
 
-    // Lookups
-    @State private var accountById: [AccountID: Account] = [:]
+    @State private var month: Date = Date()
+    @State private var items: [Transaction] = []
+
+    // lookups for category names
     @State private var categoryById: [CategoryID: Category] = [:]
 
-    // Data
-    @State private var txs: [TxVM] = []
+    // derived
+    @State private var incomeCents: Int = 0
+    @State private var expenseCents: Int = 0
+    @State private var netCents: Int = 0
+    @State private var topCategories: [(name: String, cents: Int)] = []
 
-    private var monthTx: [TxVM] {
-        let (start, end) = monthBounds(for: month)
-        return txs.filter { $0.date >= start && $0.date < end }
-    }
-    private var income: Int  { monthTx.filter { $0.kind == .income  }.map(\.amountCents).reduce(0,+) }
-    private var expense: Int { monthTx.filter { $0.kind == .expense }.map(\.amountCents).reduce(0,+) }
-    private var net: Int { income - expense }
-
-    private var topCategories: [(String, Int)] {
-        let items = monthTx.filter { $0.kind == .expense }
-        let grouped = Dictionary(grouping: items, by: { $0.categoryName ?? "Other" })
-        return grouped
-            .map { (k, v) in (k, v.map(\.amountCents).reduce(0,+)) }
-            .sorted(by: { $0.1 > $1.1 })
-            .prefix(5)
-            .map { ($0.0, $0.1) }
-    }
+    // export
+    @State private var isExporting = false
+    @State private var exportURL: URL?
 
     var body: some View {
-        List {
-            Section {
-                HStack {
-                    MonthPicker(date: $month)
-                    Spacer()
-                    Button {
-                        exportPDF()
-                    } label: {
-                        Label("Export PDF", systemImage: "square.and.arrow.up")
-                    }
-                }
+        VStack(spacing: 12) {
+            // Header
+            HStack {
+                Button {
+                    month = Calendar.current.date(byAdding: .month, value: -1, to: month)!
+                    Task { await reload() }
+                } label: { Image(systemName: "chevron.left") }
+
+                Spacer()
+
+                Text(monthTitle(month))
+                    .font(.largeTitle).bold()
+
+                Spacer()
+
+                Button {
+                    month = Calendar.current.date(byAdding: .month, value: +1, to: month)!
+                    Task { await reload() }
+                } label: { Image(systemName: "chevron.right") }
+            }
+            .padding(.horizontal)
+
+            // Summary card
+            SummaryCard(incomeCents: incomeCents, expenseCents: expenseCents, netCents: netCents)
+
+            // Donut
+            if expenseCents > 0 {
+                DonutCard(
+                    slices: topCategories.map { DonutChart.Slice(label: $0.name, value: Double($0.cents)) }
+                )
             }
 
-            Section("Summary") {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Income").font(.caption).foregroundStyle(.secondary)
-                        MoneyText(income).foregroundStyle(.green)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text("Expenses").font(.caption).foregroundStyle(.secondary)
-                        MoneyText(expense).foregroundStyle(.red)
+            // Top categories list
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Top Categories").font(.headline)
+                    if topCategories.isEmpty {
+                        Text("No expenses this month").foregroundStyle(.secondary)
+                    } else {
+                        ForEach(topCategories, id: \.name) { row in   // <-- no Binding here
+                            HStack {
+                                Text(row.name)
+                                Spacer()
+                                MoneyText(row.cents)                    // <-- correct init
+                                    .foregroundStyle(.red)
+                                    .font(.headline)
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
                 }
-                HStack {
-                    Text("Net").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    MoneyText(net).font(.title3).bold()
-                        .foregroundStyle(net >= 0 ? .green : .red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal)
+
+            Spacer(minLength: 8)
+        }
+        .navigationTitle("Reports")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await exportPDF() }
+                } label: {
+                    Label("Export PDF", systemImage: "square.and.arrow.up")
                 }
             }
+        }
+        .task {
+            restoreMonth()
+            await reload()
+        }
+        .onChange(of: month) { _, _ in persistMonth() }
+        .sheet(isPresented: $isExporting, onDismiss: { exportURL = nil }) {
+            if let url = exportURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
+    }
 
-            Section("Top Categories") {
-                if topCategories.isEmpty {
-                    Text("No expenses this month").foregroundStyle(.secondary)
-                } else {
-                    ForEach(topCategories, id: \.0) { cat, cents in
-                        HStack {
-                            Text(cat)
+    // MARK: Load & compute
+
+    private func reload() async {
+        do {
+            // load categories once for name lookup
+            let cats = try await DI.categoryRepo.list(kind: nil)
+            categoryById = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
+
+            var q = TxQuery()
+            q.month = month
+            items = try await DI.txRepo.list(query: q)
+
+            // income / expense / net
+            incomeCents = items
+                .filter { $0.kind == .income }
+                .reduce(0) { $0 + $1.amount.cents }
+            expenseCents = items
+                .filter { $0.kind == .expense }
+                .reduce(0) { $0 + $1.amount.cents }
+            netCents = incomeCents - expenseCents
+
+            // top categories (expenses only)
+            let grouped = Dictionary(grouping: items.filter { $0.kind == .expense }) {
+                $0.categoryId ?? "UNCATEGORIZED"
+            }
+            let sums: [(name: String, cents: Int)] = grouped.map { (key, txs) in
+                let total = txs.reduce(0) { $0 + $1.amount.cents }
+                let name = categoryById[key]?.name ?? "Other"
+                return (name: name, cents: total)
+            }
+            topCategories = sums.sorted(by: { $0.cents > $1.cents }).prefix(6).map { $0 }
+        } catch {
+            print("Reports load failed: \(error)")
+            items = []
+            incomeCents = 0; expenseCents = 0; netCents = 0; topCategories = []
+        }
+    }
+
+    // MARK: Export
+
+    private func exportPDF() async {
+        let view = ReportsPDFView(
+            monthTitle: monthTitle(month),
+            incomeCents: incomeCents,
+            expenseCents: expenseCents,
+            netCents: netCents,
+            categories: topCategories
+        )
+        do {
+            let url = try SimplePDFExporter.export(
+                view: AnyView(view),
+                fileName: "FlowLedger_\(monthISO(month)).pdf"
+            )
+            exportURL = url
+            isExporting = true
+        } catch {
+            print("PDF export failed: \(error)")
+        }
+    }
+
+    // MARK: Utils
+
+    private func monthTitle(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "LLLL yyyy"
+        return f.string(from: d)
+    }
+
+    private func monthISO(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f.string(from: d)
+    }
+
+    private func persistMonth() {
+        storedMonthISO = monthISO(month)
+    }
+
+    private func restoreMonth() {
+        if !storedMonthISO.isEmpty {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM"
+            if let d = f.date(from: storedMonthISO) { month = d }
+        }
+    }
+}
+
+// MARK: - UI Pieces
+
+private struct SummaryCard: View {
+    let incomeCents: Int
+    let expenseCents: Int
+    let netCents: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            StatPill(title: "Income", cents: incomeCents, color: .green)
+            StatPill(title: "Expense", cents: expenseCents, color: .red)
+            StatPill(title: "Net", cents: netCents, color: netCents >= 0 ? .green : .red)
+        }
+        .padding(.horizontal)
+    }
+
+    private struct StatPill: View {
+        let title: String
+        let cents: Int
+        let color: Color
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(.caption).foregroundStyle(.secondary)
+                MoneyText(cents)                    // <-- correct init
+                    .font(.title3).bold()
+                    .foregroundStyle(color)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+}
+
+private struct DonutCard: View {
+    // Use the SAME slice type as DonutChart to avoid mismatches
+    let slices: [DonutChart.Slice]
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Spending by Category").font(.headline)
+                DonutChart(slices: slices)
+                    .frame(height: 180)
+
+                // Legend
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(slices.enumerated()), id: \.offset) { idx, s in
+                        HStack(spacing: 8) {
+                            Circle().fill(DonutChart.color(for: idx)).frame(width: 10, height: 10)
+                            Text(s.label)
                             Spacer()
-                            MoneyText(cents)
+                            Text(MoneyText.formatCents(Int(s.value))).monospacedDigit()
                         }
                     }
                 }
             }
-
-            Section("Notes") {
-                Text("SwiftData-backed report for the selected month.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Reports")
-        .sheet(isPresented: $showingShare) {
-            if let shareURL {
-                ShareLink(item: shareURL) { Label("Share Report", systemImage: "square.and.arrow.up") }
-                    .padding()
-            } else {
-                Text("Failed to create report").padding()
-            }
-        }
-        .task {
-            await loadLookups()
-            await reload()
-        }
-        .onChange(of: month) { _ in
-            Task { await reload() }
-        }
-    }
-
-    // MARK: Data
-
-    private func loadLookups() async {
-        do {
-            let accs = try await DI.listAccounts.execute()
-            accountById = Dictionary(uniqueKeysWithValues: accs.map { ($0.id, $0) })
-
-            let cats = try await DI.categoryRepo.list(kind: nil)
-            categoryById = Dictionary(uniqueKeysWithValues: cats.map { ($0.id, $0) })
-        } catch {
-            print("Reports lookups failed: \(error)")
-        }
-    }
-
-    private func reload() async {
-        do {
-            var q = TxQuery()
-            q.month = month
-            let domainItems = try await DI.txRepo.list(query: q)
-            txs = domainItems.map { mapTransactionToVM($0, accountsById: accountById, categoriesById: categoryById) }
-        } catch {
-            print("Reports load failed: \(error)")
-        }
-    }
-
-    // MARK: PDF
-
-    private func exportPDF() {
-        let monthTitle = month.formatted(.dateTime.month().year())
-        let blocks: [PDFExporter.ReportBlock] = [
-            .init(title: "Summary \(monthTitle)", lines: [
-                "Income: \(formatCHF(income))",
-                "Expenses: \(formatCHF(expense))",
-                "Net: \(formatCHF(net))"
-            ]),
-            .init(title: "Top Categories", lines: topCategories.map { "\($0.0): \(formatCHF($0.1))" })
-        ]
-
-        do {
-            let url = try PDFExporter.makePDFFile(
-                fileName: "FlowLedger-\(monthTitle)",
-                title: "FlowLedger Monthly Report — \(monthTitle)",
-                blocks: blocks
-            )
-            shareURL = url
-            showingShare = true
-        } catch {
-            shareURL = nil
-            showingShare = true
-        }
-    }
-
-    // MARK: Helpers
-
-    private func formatCHF(_ cents: Int) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .currency
-        f.currencyCode = "CHF"
-        return f.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "CHF 0.00"
-    }
-
-    private func monthBounds(for date: Date) -> (Date, Date) {
-        let cal = Calendar.current
-        let start = cal.date(from: cal.dateComponents([.year, .month], from: date))!
-        let end = cal.date(byAdding: DateComponents(month: 1), to: start)!
-        return (start, end)
+        .padding(.horizontal)
     }
 }

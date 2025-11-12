@@ -172,9 +172,6 @@
     "Export PDF" : {
 
     },
-    "Failed to create report" : {
-
-    },
     "Filter menu" : {
 
     },
@@ -182,6 +179,9 @@
 
     },
     "Flags" : {
+
+    },
+    "FlowLedger Report" : {
 
     },
     "FlowLedger v1.0" : {
@@ -262,9 +262,6 @@
     "Note (optional)" : {
 
     },
-    "Notes" : {
-
-    },
     "OK" : {
 
     },
@@ -316,9 +313,6 @@
     "Seed demo data (TODO)" : {
 
     },
-    "Share Report" : {
-
-    },
     "Show Cleared" : {
 
     },
@@ -331,10 +325,7 @@
     "Source" : {
 
     },
-    "Summary" : {
-
-    },
-    "SwiftData-backed report for the selected month." : {
+    "Spending by Category" : {
 
     },
     "tab.accounts" : {
