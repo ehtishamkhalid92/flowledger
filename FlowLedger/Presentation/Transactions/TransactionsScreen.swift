@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Screen
-
 struct TransactionsScreen: View {
     // Persisted filter bits
     @AppStorage("tx.filter.account") private var storedAccount: String = ""
@@ -19,6 +17,10 @@ struct TransactionsScreen: View {
 
     @State private var filter = TxFilterState()
     @State private var showAddSheet = false
+
+    // EDIT / DELETE UI
+    @State private var editing: TxVM? = nil
+    @State private var pendingDelete: TxVM? = nil
 
     // Lookups from domain
     @State private var accounts: [String] = []
@@ -46,7 +48,7 @@ struct TransactionsScreen: View {
                 search: $filter.search,
                 showClearedOnly: $filter.showClearedOnly,
                 onReload: { Task { await reloadFromRepo() } },
-                onClearFilters: { persistFilters() }   // if you persist; otherwise remove
+                onClearFilters: { persistFilters() }
             )
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -60,6 +62,27 @@ struct TransactionsScreen: View {
                     Section(section.monthTitle) {
                         ForEach(section.items) { item in
                             TransactionRow(vm: item)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    editing = item
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {   // was true
+                                    Button {
+                                        Task {
+                                            await toggleCleared(item)
+                                            await reloadFromRepo()
+                                        }
+                                    } label: {
+                                        Label(item.isCleared ? "Unclear" : "Clear",
+                                              systemImage: item.isCleared ? "xmark.circle" : "checkmark.circle")
+                                    }.tint(.blue)
+
+                                    Button(role: .destructive) {
+                                        pendingDelete = item
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
                 }
@@ -84,6 +107,7 @@ struct TransactionsScreen: View {
                 }
             }
         }
+        // ADD
         .sheet(isPresented: $showAddSheet) {
             AddTransactionSheet(
                 accounts: accounts,
@@ -97,6 +121,53 @@ struct TransactionsScreen: View {
             )
             .presentationDetents([.medium, .large])
         }
+        // EDIT (prefilled)
+        .sheet(item: $editing, onDismiss: {
+            editing = nil
+        }) { tx in
+            AddTransactionSheet(
+                accounts: accounts,
+                categories: categories,
+                preset: .init(
+                    kind: tx.kind,
+                    amountCents: abs(tx.amountCents),
+                    accountName: tx.accountName,
+                    toAccountName: tx.toAccountName,
+                    categoryName: tx.categoryName,
+                    note: tx.note ?? "",
+                    date: tx.date,
+                    cleared: tx.isCleared
+                ),
+                onSave: { updated in
+                    Task {
+                        // simplest: delete & recreate with new values
+                        await deleteTx(tx)
+                        await saveViaDomain(updated)
+                        await reloadFromRepo()
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        // DELETE confirm
+        // DELETE confirm (replace your .confirmationDialog with this)
+        .alert("Delete transaction?", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { tx in
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteTx(tx)
+                    pendingDelete = nil
+                    await reloadFromRepo()
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDelete = nil
+            }
+        } message: { _ in
+            Text("This cannot be undone.")
+        }
         .task {
             restoreFilters()
             await loadLookups()
@@ -106,21 +177,11 @@ struct TransactionsScreen: View {
         .onChange(of: filter.month) { _, _ in
             Task { await reloadFromRepo(); persistFilters(); recalcTotals() }
         }
-        .onChange(of: filter.account) { _, _ in
-            persistFilters(); recalcTotals()
-        }
-        .onChange(of: filter.category) { _, _ in
-            persistFilters(); recalcTotals()
-        }
-        .onChange(of: filter.search) { _, _ in
-            persistFilters(); recalcTotals()
-        }
-        .onChange(of: filter.showClearedOnly) { _, _ in
-            persistFilters(); recalcTotals()
-        }
-        .onChange(of: txs) { _, _ in
-            recalcTotals()
-        }
+        .onChange(of: filter.account) { _, _ in persistFilters(); recalcTotals() }
+        .onChange(of: filter.category) { _, _ in persistFilters(); recalcTotals() }
+        .onChange(of: filter.search) { _, _ in persistFilters(); recalcTotals() }
+        .onChange(of: filter.showClearedOnly) { _, _ in persistFilters(); recalcTotals() }
+        .onChange(of: txs) { _, _ in recalcTotals() }
     }
 
     // MARK: Domain wiring
@@ -237,6 +298,51 @@ struct TransactionsScreen: View {
             date: t.date,
             isCleared: t.isCleared
         )
+    }
+    // MARK: Row actions
+
+    private func toggleCleared(_ vm: TxVM) async {
+        await updateCleared(vm, !vm.isCleared)
+    }
+
+    private func deleteTx(_ vm: TxVM) async {
+        do {
+            try await DI.txRepo.delete(id: vm.id)
+        } catch {
+            print("Delete failed: \(error)")
+        }
+    }
+
+    /// Update only the `isCleared` flag without creating a new row.
+    /// We build a domain `Transaction` with the SAME id and save; SD repo updates it.
+    private func updateCleared(_ vm: TxVM, _ newValue: Bool) async {
+        do {
+            guard let fromId = accountByName[vm.accountName] else { return }
+            let toId = vm.toAccountName.flatMap { accountByName[$0] }
+            let catId = vm.categoryName.flatMap { categoryByName[$0] }
+
+            let domain = Transaction(
+                id: vm.id,
+                kind: {
+                    switch vm.kind {
+                    case .expense:  return .expense
+                    case .income:   return .income
+                    case .transfer: return .transfer
+                    }
+                }(),
+                amount: Money(cents: abs(vm.amountCents)),
+                accountId: fromId,
+                counterpartyAccountId: toId,
+                categoryId: catId,
+                note: vm.note,
+                date: vm.date,
+                isCleared: newValue
+            )
+
+            try await DI.txRepo.save(domain)   // SD repo updates existing row (same id)
+        } catch {
+            print("Update cleared failed: \(error)")
+        }
     }
 
     // MARK: Totals

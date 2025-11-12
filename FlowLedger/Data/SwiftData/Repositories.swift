@@ -10,6 +10,7 @@ import SwiftData
 
 // MARK: - AccountRepository
 
+@MainActor
 final class SDAccountRepository: AccountRepository {
     private let ctx: ModelContext
     init(ctx: ModelContext) { self.ctx = ctx }
@@ -41,11 +42,14 @@ final class SDAccountRepository: AccountRepository {
     }
 
     func delete(id: AccountID) async throws {
-        if let entity = try findEntity(id: id) {
-            ctx.delete(entity)
-            try ctx.save()
-        }
+        let predicate = #Predicate<AccountEntity> { $0.id == id }
+        let fetch = FetchDescriptor<AccountEntity>(predicate: predicate)
+        let matches = try ctx.fetch(fetch)
+        for e in matches { ctx.delete(e) }
+        try ctx.save()
     }
+
+    // MARK: - helpers
 
     private func findEntity(id: String) throws -> AccountEntity? {
         let predicate = #Predicate<AccountEntity> { $0.id == id }
@@ -57,6 +61,7 @@ final class SDAccountRepository: AccountRepository {
 
 // MARK: - CategoryRepository
 
+@MainActor
 final class SDCategoryRepository: CategoryRepository {
     private let ctx: ModelContext
     init(ctx: ModelContext) { self.ctx = ctx }
@@ -82,6 +87,8 @@ final class SDCategoryRepository: CategoryRepository {
         try ctx.save()
     }
 
+    // MARK: - helpers
+
     private func findEntity(id: String) throws -> CategoryEntity? {
         let predicate = #Predicate<CategoryEntity> { $0.id == id }
         var fetch = FetchDescriptor<CategoryEntity>(predicate: predicate)
@@ -92,6 +99,7 @@ final class SDCategoryRepository: CategoryRepository {
 
 // MARK: - TransactionRepository
 
+@MainActor
 final class SDTransactionRepository: TransactionRepository {
     private let ctx: ModelContext
     init(ctx: ModelContext) { self.ctx = ctx }
@@ -159,13 +167,15 @@ final class SDTransactionRepository: TransactionRepository {
     }
 
     func delete(id: TransactionID) async throws {
-        if let entity = try findTx(id: id) {
-            ctx.delete(entity)
-            try ctx.save()
-        }
+        // Delete ALL matches defensively (handles stray duplicates)
+        let predicate = #Predicate<TransactionEntity> { $0.id == id }
+        let fetch = FetchDescriptor<TransactionEntity>(predicate: predicate)
+        let matches = try ctx.fetch(fetch)
+        for e in matches { ctx.delete(e) }
+        try ctx.save()
     }
 
-    // MARK: helpers
+    // MARK: - helpers
 
     private func findTx(id: String) throws -> TransactionEntity? {
         let predicate = #Predicate<TransactionEntity> { $0.id == id }

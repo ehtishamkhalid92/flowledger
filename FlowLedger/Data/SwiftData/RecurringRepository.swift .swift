@@ -13,7 +13,7 @@ final class SDRecurringRepository: RecurringRepository {
     init(ctx: ModelContext) { self.ctx = ctx }
 
     func listActive() async throws -> [RecurringRule] {
-        var fetch = FetchDescriptor<RecurringRuleEntity>(
+        let fetch = FetchDescriptor<RecurringRuleEntity>(
             sortBy: [SortDescriptor(\.name, order: .forward)]
         )
         // simple: include all; you can filter by endDate later

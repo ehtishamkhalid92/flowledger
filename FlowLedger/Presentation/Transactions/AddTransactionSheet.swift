@@ -11,6 +11,7 @@ struct AddTransactionSheet: View {
     // Inputs from parent
     var accounts: [String]
     var categories: [String]
+    var preset: TxPreset? = nil
     var onSave: (TxVM) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -88,7 +89,7 @@ struct AddTransactionSheet: View {
                         .disableAutocorrection(true)
                 }
             }
-            .navigationTitle("Add Transaction")
+            .navigationTitle(preset == nil ? "Add Transaction" : "Edit Transaction")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -98,16 +99,32 @@ struct AddTransactionSheet: View {
                         .disabled(!saveEnabled)
                 }
             }
-            .onAppear(perform: seedDefaults)
+            .onAppear(perform: seedFromPresetOrDefaults)
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Preset & save
 
-    private func seedDefaults() {
-        if fromAccount.isEmpty, let first = accounts.first { fromAccount = first }
-        if toAccount.isEmpty, let second = accounts.dropFirst().first ?? accounts.first { toAccount = second }
-        if category.isEmpty, let cat = categories.first { category = cat }
+    private func seedFromPresetOrDefaults() {
+        if let p = preset {
+            switch p.kind {
+            case .expense:  kindIndex = 0
+            case .income:   kindIndex = 1
+            case .transfer: kindIndex = 2
+            }
+            amountText = String(format: "%.2f", Double(p.amountCents) / 100.0)
+            fromAccount = p.accountName ?? accounts.first ?? ""
+            toAccount = p.toAccountName ?? (accounts.dropFirst().first ?? accounts.first ?? "")
+            category = p.categoryName ?? categories.first ?? ""
+            note = p.note
+            date = p.date
+            isCleared = p.cleared
+        } else {
+            // defaults
+            if fromAccount.isEmpty, let first = accounts.first { fromAccount = first }
+            if toAccount.isEmpty, let second = accounts.dropFirst().first ?? accounts.first { toAccount = second }
+            if category.isEmpty, let cat = categories.first { category = cat }
+        }
     }
 
     private func save() {
@@ -123,7 +140,7 @@ struct AddTransactionSheet: View {
         }()
 
         let vm = TxVM(
-            id: UUID().uuidString,
+            id: preset == nil ? UUID().uuidString : UUID().uuidString, // we delete & recreate on edit
             kind: kind,
             amountCents: cents,
             accountName: fromAccount,
@@ -160,4 +177,16 @@ struct AddTransactionSheet: View {
         case .transfer: return "arrow.left.arrow.right.circle.fill"
         }
     }
+}
+
+// Prefill container for editing
+struct TxPreset {
+    let kind: TxVM.Kind
+    let amountCents: Int
+    let accountName: String?
+    let toAccountName: String?
+    let categoryName: String?
+    let note: String
+    let date: Date
+    let cleared: Bool
 }
