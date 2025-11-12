@@ -100,7 +100,16 @@
     "CHF 700 / mo" : {
 
     },
+    "Clear" : {
+
+    },
     "Clear all data (TODO)" : {
+
+    },
+    "Clear all filters" : {
+
+    },
+    "Clear Filters" : {
 
     },
     "Cleared" : {
@@ -157,6 +166,9 @@
     "Failed to create report" : {
 
     },
+    "Filter menu" : {
+
+    },
     "Fixed (CHF)" : {
 
     },
@@ -176,6 +188,9 @@
 
     },
     "Goals (placeholder)" : {
+
+    },
+    "Hide Cleared" : {
 
     },
     "iCloud Sync (placeholder)" : {
@@ -295,6 +310,9 @@
     "Share Report" : {
 
     },
+    "Show Cleared" : {
+
+    },
     "Show cleared only" : {
 
     },
@@ -364,6 +382,9 @@
 
     },
     "Theme" : {
+
+    },
+    "This Month" : {
 
     },
     "To" : {

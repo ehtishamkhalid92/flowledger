@@ -10,6 +10,13 @@ import SwiftUI
 // MARK: - Screen
 
 struct TransactionsScreen: View {
+    // Persisted filter bits
+    @AppStorage("tx.filter.account") private var storedAccount: String = ""
+    @AppStorage("tx.filter.category") private var storedCategory: String = ""
+    @AppStorage("tx.filter.search") private var storedSearch: String = ""
+    @AppStorage("tx.filter.clearedOnly") private var storedClearedOnly: Bool = false
+    @AppStorage("tx.filter.month") private var storedMonthISO: String = ""   // ISO yyyy-MM
+
     @State private var filter = TxFilterState()
     @State private var showAddSheet = false
 
@@ -24,18 +31,30 @@ struct TransactionsScreen: View {
     // Repo-backed list (we still apply UI-side filters)
     @State private var txs: [TxVM] = []
 
+    // Totals for current filtered dataset
+    @State private var incomeCents = 0
+    @State private var expenseCents = 0
+    @State private var netCents = 0
+
     var body: some View {
         VStack(spacing: 0) {
+            // Filters
             FilterBar(
                 month: $filter.month,
                 accounts: accounts, selectedAccount: $filter.account,
                 categories: categories, selectedCategory: $filter.category,
                 search: $filter.search,
-                showClearedOnly: $filter.showClearedOnly
+                showClearedOnly: $filter.showClearedOnly,
+                onReload: { Task { await reloadFromRepo() } },
+                onClearFilters: { persistFilters() }   // if you persist; otherwise remove
             )
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
+            // Totals
+            TotalsBar(incomeCents: incomeCents, expenseCents: expenseCents, netCents: netCents)
+
+            // List
             List {
                 ForEach(sectioned(txs: filtered(txs: txs)), id: \.monthId) { section in
                     Section(section.monthTitle) {
@@ -49,6 +68,14 @@ struct TransactionsScreen: View {
         }
         .navigationTitle(String(localized: "tab.transactions"))
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    clearFilters()
+                } label: {
+                    Label("Clear", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .help("Clear all filters")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showAddSheet = true
@@ -71,11 +98,28 @@ struct TransactionsScreen: View {
             .presentationDetents([.medium, .large])
         }
         .task {
+            restoreFilters()
             await loadLookups()
             await reloadFromRepo()
+            recalcTotals()
         }
-        .onChange(of: filter.month) { _ in
-            Task { await reloadFromRepo() }
+        .onChange(of: filter.month) { _, _ in
+            Task { await reloadFromRepo(); persistFilters(); recalcTotals() }
+        }
+        .onChange(of: filter.account) { _, _ in
+            persistFilters(); recalcTotals()
+        }
+        .onChange(of: filter.category) { _, _ in
+            persistFilters(); recalcTotals()
+        }
+        .onChange(of: filter.search) { _, _ in
+            persistFilters(); recalcTotals()
+        }
+        .onChange(of: filter.showClearedOnly) { _, _ in
+            persistFilters(); recalcTotals()
+        }
+        .onChange(of: txs) { _, _ in
+            recalcTotals()
         }
     }
 
@@ -167,9 +211,9 @@ struct TransactionsScreen: View {
             .flatMap { categoryById[$0]?.icon }
             ?? {
                 switch t.kind {
-                case .expense:  return "cart.fill"
-                case .income:   return "arrow.down.circle.fill"
-                case .transfer: return "arrow.left.arrow.right"
+                case .expense:  return "minus.circle.fill"
+                case .income:   return "plus.circle.fill"
+                case .transfer: return "arrow.left.arrow.right.circle.fill"
                 }
             }()
 
@@ -193,6 +237,17 @@ struct TransactionsScreen: View {
             date: t.date,
             isCleared: t.isCleared
         )
+    }
+
+    // MARK: Totals
+
+    private func recalcTotals() {
+        let items = filtered(txs: txs)
+        let income = items.filter { $0.kind == .income }.reduce(0) { $0 + abs($1.amountCents) }
+        let expense = items.filter { $0.kind == .expense }.reduce(0) { $0 + abs($1.amountCents) }
+        incomeCents = income
+        expenseCents = expense
+        netCents = income - expense
     }
 
     // MARK: Filtering & sectioning (UI side)
@@ -235,5 +290,42 @@ struct TransactionsScreen: View {
         let start = cal.date(from: cal.dateComponents([.year, .month], from: date))!
         let end = cal.date(byAdding: DateComponents(month: 1), to: start)!
         return (start, end)
+    }
+
+    // MARK: Persist / Restore filters
+
+    private func persistFilters() {
+        storedAccount = filter.account ?? ""
+        storedCategory = filter.category ?? ""
+        storedSearch = filter.search
+        storedClearedOnly = filter.showClearedOnly
+        storedMonthISO = monthISO(filter.month)
+    }
+
+    private func restoreFilters() {
+        filter.account = storedAccount.isEmpty ? nil : storedAccount
+        filter.category = storedCategory.isEmpty ? nil : storedCategory
+        filter.search = storedSearch
+        filter.showClearedOnly = storedClearedOnly
+        if let d = parseMonthISO(storedMonthISO) { filter.month = d }
+    }
+
+    private func monthISO(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        f.timeZone = .current
+        return f.string(from: date)
+    }
+    private func parseMonthISO(_ s: String) -> Date? {
+        guard !s.isEmpty else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        f.timeZone = .current
+        return f.date(from: s)
+    }
+
+    private func clearFilters() {
+        filter = TxFilterState()
+        persistFilters()
     }
 }

@@ -8,83 +8,129 @@
 import SwiftUI
 
 struct FilterBar: View {
+    // Inputs
     @Binding var month: Date
+
     let accounts: [String]
     @Binding var selectedAccount: String?
+
     let categories: [String]
     @Binding var selectedCategory: String?
+
     @Binding var search: String
     @Binding var showClearedOnly: Bool
 
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                MonthPicker(date: $month)
-                Toggle(isOn: $showClearedOnly) {
-                    Image(systemName: showClearedOnly ? "checkmark.circle" : "circle")
-                }
-                .toggleStyle(.button)
-                .help("Show cleared only")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    // Optional action hooks (parent can ignore)
+    var onReload: (() -> Void)?         // e.g. reload from repo after month changes
+    var onClearFilters: (() -> Void)?   // parent can reset persisted filters if desired
 
-            ScrollView(.horizontal, showsIndicators: false) {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+
+            // ── Top row: menu + month stepper
+            HStack(spacing: 12) {
+                // The icon is now an interactive Menu
+                Menu {
+                    Button("This Month", systemImage: "calendar") {
+                        month = Date()
+                        onReload?()
+                    }
+                    Button(showClearedOnly ? "Hide Cleared" : "Show Cleared",
+                           systemImage: showClearedOnly ? "checkmark.circle.fill" : "circle") {
+                        showClearedOnly.toggle()
+                    }
+                    Divider()
+                    Button("Clear Filters", systemImage: "xmark.circle") {
+                        selectedAccount = nil
+                        selectedCategory = nil
+                        search = ""
+                        showClearedOnly = false
+                        onClearFilters?()
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.circle")
+                        .font(.title3)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Filter menu")
+                }
+
+                // Simple month stepper
                 HStack(spacing: 8) {
-                    Chip(title: selectedAccount ?? "Account", systemImage: "creditcard", isActive: selectedAccount != nil) {
-                        // simple inline menu
-                    }.contextMenu {
-                        Button("All Accounts") { selectedAccount = nil }
-                        Divider()
+                    Button {
+                        month = Calendar.current.date(byAdding: .month, value: -1, to: month) ?? month
+                        onReload?()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    Text(monthTitle(month))
+                        .font(.headline)
+                        .monospacedDigit()
+
+                    Button {
+                        month = Calendar.current.date(byAdding: .month, value: 1, to: month) ?? month
+                        onReload?()
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+
+            // ── Chips / fields row
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    // Account pill
+                    Menu {
+                        Button("All Accounts", action: { selectedAccount = nil })
                         ForEach(accounts, id: \.self) { acc in
-                            Button(acc) { selectedAccount = acc }
+                            Button(acc, action: { selectedAccount = acc })
                         }
+                    } label: {
+                        pillLabel(title: "Account", value: selectedAccount)
                     }
 
-                    Chip(title: selectedCategory ?? "Category", systemImage: "tag", isActive: selectedCategory != nil) {}
-                        .contextMenu {
-                            Button("All Categories") { selectedCategory = nil }
-                            Divider()
-                            ForEach(categories, id: \.self) { cat in
-                                Button(cat) { selectedCategory = cat }
-                            }
+                    // Category pill
+                    Menu {
+                        Button("All Categories", action: { selectedCategory = nil })
+                        ForEach(categories, id: \.self) { cat in
+                            Button(cat, action: { selectedCategory = cat })
                         }
+                    } label: {
+                        pillLabel(title: "Category", value: selectedCategory)
+                    }
 
+                    // Search field
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
                         TextField("Search note…", text: $search)
-                            .textFieldStyle(.plain)
-                            .disableAutocorrection(true)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                     }
-                    .padding(.horizontal, 10).padding(.vertical, 8)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .padding(.horizontal, 4)
             }
         }
     }
-}
 
-// MARK: Helpers
+    // MARK: helpers
 
-struct Chip: View {
-    let title: String
-    let systemImage: String
-    let isActive: Bool
-    var action: () -> Void
+    private func monthTitle(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "LLLL yyyy"
+        return f.string(from: date)
+    }
 
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                Text(title)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isActive ? Color.accentColor.opacity(0.15) : Color(.secondarySystemGroupedBackground))
-            )
+    private func pillLabel(title: String, value: String?) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+            if let v = value { Text(v).foregroundStyle(.secondary) }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
